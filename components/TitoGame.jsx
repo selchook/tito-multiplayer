@@ -236,6 +236,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const dragSA = useRef(0);
   const cameraDragStartX = useRef(0);
   const cameraStartViewportX = useRef(0);
+  const nextWindRef = useRef(null); // Pre-computed wind for next turn (multiplayer sync)
+  const turnCounterRef = useRef(0); // Deterministic turn counter for wind seeds
   const S = useRef({});
   S.current = { terrain, p1, p2, turn, scores, level, wind, snd, phase, cameraZoom, envObjects };
   chargingRef.current = charging;
@@ -254,11 +256,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setFloats(f => [...f, { id, x, y, text, color }]);
     setTimeout(() => setFloats(f => f.filter(v => v.id !== id)), 1300);
   }, []);
-
-  const newWindFromSeed = (seed) => {
-    const rng = createSeededRandom(seed);
-    return (rng() - 0.5) * 0.08;
-  };
 
   const getPowerMultiplier = useCallback(() => 0.245, []);
 
@@ -287,18 +284,25 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setFloats([]); setCharging(false); setChargeProg(0);
     setCameraZoom(1);
     setViewportY(0);
+    turnCounterRef.current = 0; // Reset turn counter for deterministic wind
+    nextWindRef.current = null;
     setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, Math.floor(x1) - VIEW_W / 2)));
     currentSeedRef.current = seed;
   }, [isMultiplayer, myPlayer]);
 
   const startNewMatch = useCallback(() => {
+    if (isMultiplayer && !isHost) {
+      // Guest requests new match from host
+      sendMsg({ type: "requestNewMatch" });
+      return;
+    }
     const newSeed = generateSeed();
     setScores([0, 0]); setLevel(1); setMatchWinner(null);
     setupLevelFromSeed(newSeed);
     if (isMultiplayer) {
       sendMsg({ type: "newMatch", seed: newSeed });
     }
-  }, [setupLevelFromSeed, isMultiplayer, sendMsg]);
+  }, [setupLevelFromSeed, isMultiplayer, isHost, sendMsg]);
 
   // Init
   useEffect(() => { setupLevelFromSeed(initialSeed); }, []);
@@ -310,8 +314,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     const handleData = (data) => {
       switch (data.type) {
         case "fire":
-          // Remote player fired - apply their action
-          handleRemoteFire(data.angle, data.power);
+          // Remote player fired — use their EXACT projectile state
+          handleRemoteFire(data);
           break;
         case "move":
           // Remote player moved their tank
@@ -342,8 +346,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           setScores([0, 0]); setLevel(1); setMatchWinner(null);
           setupLevelFromSeed(data.seed);
           break;
-        case "windChange":
-          setWind(data.wind);
+        case "requestNewMatch":
+          // Guest requested new match — host generates and sends seed
+          if (isHost) {
+            const newSeed = generateSeed();
+            setScores([0, 0]); setLevel(1); setMatchWinner(null);
+            setupLevelFromSeed(newSeed);
+            sendMsg({ type: "newMatch", seed: newSeed });
+          }
           break;
       }
     };
@@ -362,22 +372,24 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   }, [isMultiplayer, conn, setupLevelFromSeed]);
 
   // ─── REMOTE FIRE HANDLER ──────────────────────────────────
-  const handleRemoteFire = useCallback((angle, power) => {
-    const { turn: t, p1: a, p2: b, snd: sd } = S.current;
-    // Update remote tank's angle and power
-    const tank = t === 0 ? { ...a, angle, power } : { ...b, angle, power };
-    if (t === 0) setP1(v => ({ ...v, angle, power }));
-    else setP2(v => ({ ...v, angle, power }));
+  // Uses the EXACT projectile state from the firing player — no local recomputation
+  const handleRemoteFire = useCallback((data) => {
+    const { turn: t, snd: sd } = S.current;
+    const { proj: exactProj, angle, power, tankX, tankY, nextWind } = data;
+
+    // Sync the remote tank's position/angle/power exactly
+    if (t === 0) setP1(v => ({ ...v, x: tankX, y: tankY, angle, power }));
+    else setP2(v => ({ ...v, x: tankX, y: tankY, angle, power }));
+
+    // Store next wind to apply when the shot resolves
+    nextWindRef.current = nextWind;
+
+    // Use the exact projectile physics from the firing player
+    const p = { x: exactProj.x, y: exactProj.y, vx: exactProj.vx, vy: exactProj.vy };
 
     const fr = t === 0;
     const rad = ((fr ? -angle : -(180 - angle)) * Math.PI) / 180;
-    const powerMultiplier = 0.245;
-    const spd = power * powerMultiplier;
-    const barrelX = tank.x + Math.cos(rad) * 24;
-    const barrelY = tank.y - 13 + Math.sin(rad) * 24;
-    const p = { x: barrelX, y: barrelY, vx: Math.cos(rad) * spd, vy: Math.sin(rad) * spd };
-
-    setFiringEffect({ tankIdx: t, frame: 0, barrelX, barrelY, angle: rad });
+    setFiringEffect({ tankIdx: t, frame: 0, barrelX: exactProj.x, barrelY: exactProj.y, angle: rad });
     projRef.current = { ...p };
     setProj(p); setTrail([]); setChargeProg(0);
     setPhase("flying");
@@ -455,6 +467,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       vx: Math.cos(rad) * spd, vy: Math.sin(rad) * spd,
     };
 
+    // Pre-compute the next wind value deterministically
+    turnCounterRef.current++;
+    const windSeed = currentSeedRef.current + turnCounterRef.current * 7919; // prime multiplier
+    const nextWind = (createSeededRandom(windSeed)() - 0.5) * 0.08;
+    nextWindRef.current = nextWind;
+
     setFiringEffect({ tankIdx: t, frame: 0, barrelX, barrelY, angle: rad });
     if (t === 0) setP1(v => ({ ...v, power })); else setP2(v => ({ ...v, power }));
     projRef.current = { ...p };
@@ -463,9 +481,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setMsg("💥 INCOMING!");
     if (sd) sfxFire();
 
-    // Send fire action to peer
+    // Send EXACT projectile state + pre-computed next wind to peer
     if (isMultiplayer) {
-      sendMsg({ type: "fire", angle: tank.angle, power });
+      sendMsg({
+        type: "fire",
+        proj: { x: p.x, y: p.y, vx: p.vx, vy: p.vy },
+        angle: tank.angle,
+        power,
+        tankX: tank.x,
+        tankY: tank.y,
+        nextWind,
+      });
     }
   }, [isMultiplayer, sendMsg]);
 
@@ -510,11 +536,15 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         const nextTank = t === 0 ? S.current.p2 : S.current.p1;
         setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, nextTank.x - VIEW_W / 2)));
 
-        // Generate new wind deterministically
-        const windSeed = currentSeedRef.current + Date.now();
-        const newW = (createSeededRandom(windSeed)() - 0.5) * 0.08;
-        setWind(newW);
-        if (isMultiplayer) sendMsg({ type: "windChange", wind: newW });
+        // Use pre-computed wind (from firing player) for perfect sync
+        if (isMultiplayer && nextWindRef.current !== null) {
+          setWind(nextWindRef.current);
+          nextWindRef.current = null;
+        } else if (!isMultiplayer) {
+          turnCounterRef.current++;
+          const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
+          setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
+        }
 
         setTurn(1 - t); setPhase("aiming");
         if (isMultiplayer) {
@@ -578,10 +608,15 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             addFloat(pr.x, ty - 20, "BOOM!", "#f59e0b");
           }
 
-          const windSeed = currentSeedRef.current + Date.now();
-          const newW = (createSeededRandom(windSeed)() - 0.5) * 0.08;
-          setWind(newW);
-          if (isMultiplayer) sendMsg({ type: "windChange", wind: newW });
+          // Use pre-computed wind (from firing player) for perfect sync
+          if (isMultiplayer && nextWindRef.current !== null) {
+            setWind(nextWindRef.current);
+            nextWindRef.current = null;
+          } else if (!isMultiplayer) {
+            turnCounterRef.current++;
+            const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
+            setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
+          }
 
           if (isMultiplayer) {
             setMsg(1 - t === myPlayer ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : "OPPONENT'S TURN — WAIT...");
@@ -666,11 +701,20 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       if (f < 120) {
         requestAnimationFrame(ani);
       } else {
-        const newSeed = generateSeed();
-        setLevel(l => l + 1);
-        setupLevelFromSeed(newSeed);
         if (S.current.snd) sfxNextLevel();
-        if (isMultiplayer) sendMsg({ type: "newLevel", seed: newSeed });
+        if (!isMultiplayer) {
+          // Single-player: generate new level immediately
+          const newSeed = generateSeed();
+          setLevel(l => l + 1);
+          setupLevelFromSeed(newSeed);
+        } else if (isHost) {
+          // Multiplayer HOST: generate seed and send to guest
+          const newSeed = generateSeed();
+          setLevel(l => l + 1);
+          setupLevelFromSeed(newSeed);
+          sendMsg({ type: "newLevel", seed: newSeed });
+        }
+        // Multiplayer GUEST: do nothing here, wait for "newLevel" message from host
       }
     };
     requestAnimationFrame(ani);
