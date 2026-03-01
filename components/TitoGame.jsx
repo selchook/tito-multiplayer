@@ -158,6 +158,38 @@ function crater(terrain, cx, r) {
 const P1 = { main: "#06b6d4", accent: "#22d3ee", glow: "rgba(6,182,212,0.3)" };
 const P2 = { main: "#f43f5e", accent: "#fb7185", glow: "rgba(244,63,94,0.3)" };
 
+// ─── PRE-SIMULATE TRAJECTORY (deterministic, frame-rate independent) ────
+// Runs the EXACT same physics loop as fly() but synchronously.
+// Returns the authoritative impact point that both sides must use.
+function simulateTrajectory(startProj, wind, terrain, tanks) {
+  let pr = { x: startProj.x, y: startProj.y, vx: startProj.vx, vy: startProj.vy };
+  for (let i = 0; i < 15000; i++) {
+    pr.vx += wind;
+    pr.vy += GRAVITY;
+    pr.x += pr.vx;
+    pr.y += pr.vy;
+    // Out of bounds
+    if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+      return { hit: false, x: pr.x, y: pr.y };
+    }
+    // Terrain collision
+    const ty = tY(terrain, pr.x);
+    if (pr.y >= ty) {
+      // Determine which tank is destroyed (if any)
+      let destroyedIdx = null;
+      if (tanks) {
+        for (let ti = 0; ti < tanks.length; ti++) {
+          const dist = Math.sqrt((tanks[ti].x - pr.x) ** 2 + (tanks[ti].y - ty) ** 2);
+          if (dist < EXPLOSION_RADIUS * 0.6) { destroyedIdx = ti; break; }
+          else if (dist < EXPLOSION_RADIUS * 1.1) { destroyedIdx = ti; }
+        }
+      }
+      return { hit: true, x: pr.x, y: ty, destroyedIdx };
+    }
+  }
+  return { hit: false, x: pr.x, y: pr.y }; // safety fallback
+}
+
 const DEBRIS = Array.from({ length: 14 }, (_, i) => ({
   angle: (i * Math.PI * 2) / 14 + (Math.random() - 0.5) * 0.5,
   speed: 40 + Math.random() * 50,
@@ -238,6 +270,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const cameraStartViewportX = useRef(0);
   const nextWindRef = useRef(null); // Pre-computed wind for next turn (multiplayer sync)
   const turnCounterRef = useRef(0); // Deterministic turn counter for wind seeds
+  const impactRef = useRef(null); // Authoritative impact point (multiplayer sync)
   const S = useRef({});
   S.current = { terrain, p1, p2, turn, scores, level, wind, snd, phase, cameraZoom, envObjects };
   chargingRef.current = charging;
@@ -259,53 +292,83 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   const getPowerMultiplier = useCallback(() => 0.245, []);
 
-  // ─── SETUP LEVEL (SEEDED) ────────────────────────────────
-  const setupLevelFromSeed = useCallback((seed) => {
+  // ─── GENERATE LEVEL STATE (pure function, returns data) ───
+  const generateLevelState = useCallback((seed) => {
     const rng = createSeededRandom(seed);
     let t = genTerrain(rng);
-    const x1 = 200 + rng() * 200;
-    const x2 = WORLD_W - 200 - rng() * 200;
-    t = createPlain(t, Math.floor(x1), 50);
-    t = createPlain(t, Math.floor(x2), 50);
+    const x1 = Math.floor(200 + rng() * 200);
+    const x2 = Math.floor(WORLD_W - 200 - rng() * 200);
+    t = createPlain(t, x1, 50);
+    t = createPlain(t, x2, 50);
     const env = genEnvironment(t, rng);
     const w = (rng() - 0.5) * 0.08;
+    return {
+      terrain: t,
+      envObjects: env,
+      p1: { x: x1, y: t[x1], angle: 60, power: 50, hp: MAX_HP },
+      p2: { x: x2, y: t[x2], angle: 60, power: 50, hp: MAX_HP },
+      p1Plain: { minX: x1 - 25, maxX: x1 + 25 },
+      p2Plain: { minX: x2 - 25, maxX: x2 + 25 },
+      wind: w,
+      seed,
+    };
+  }, []);
 
-    setTerrain(t);
-    setEnvObjects(env);
-    setP1({ x: Math.floor(x1), y: t[Math.floor(x1)], angle: 60, power: 50, hp: MAX_HP });
-    setP2({ x: Math.floor(x2), y: t[Math.floor(x2)], angle: 60, power: 50, hp: MAX_HP });
-    setP1Plain({ minX: Math.floor(x1) - 25, maxX: Math.floor(x1) + 25 });
-    setP2Plain({ minX: Math.floor(x2) - 25, maxX: Math.floor(x2) + 25 });
+  // ─── APPLY LEVEL STATE (sets all React state from data) ───
+  const applyLevelState = useCallback((state) => {
+    setTerrain(state.terrain);
+    setEnvObjects(state.envObjects);
+    setP1(state.p1);
+    setP2(state.p2);
+    setP1Plain(state.p1Plain);
+    setP2Plain(state.p2Plain);
+    setWind(state.wind);
     setTurn(0);
-    setWind(w);
     setPhase("aiming");
     setProj(null); setTrail([]); setBoom(null); setKillData(null); setTransData(null);
     setMsg(isMultiplayer && myPlayer === 0 ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : isMultiplayer ? "OPPONENT'S TURN — WAIT..." : "PLAYER 1 — HOLD 🔥 TO CHARGE!");
     setFloats([]); setCharging(false); setChargeProg(0);
     setCameraZoom(1);
     setViewportY(0);
-    turnCounterRef.current = 0; // Reset turn counter for deterministic wind
+    turnCounterRef.current = 0;
     nextWindRef.current = null;
-    setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, Math.floor(x1) - VIEW_W / 2)));
-    currentSeedRef.current = seed;
+    impactRef.current = null;
+    currentSeedRef.current = state.seed || 0;
+    setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, state.p1.x - VIEW_W / 2)));
   }, [isMultiplayer, myPlayer]);
+
+  // ─── SETUP + SYNC LEVEL ───────────────────────────────────
+  // Host generates and sends full state to guest. Guest never generates terrain.
+  const setupAndSyncLevel = useCallback((seed, msgType = "levelState") => {
+    const state = generateLevelState(seed);
+    applyLevelState(state);
+    // Host sends the actual terrain data to guest — no independent generation
+    if (isMultiplayer && isHost) {
+      sendMsg({ type: msgType, state });
+    }
+  }, [generateLevelState, applyLevelState, isMultiplayer, isHost, sendMsg]);
 
   const startNewMatch = useCallback(() => {
     if (isMultiplayer && !isHost) {
-      // Guest requests new match from host
       sendMsg({ type: "requestNewMatch" });
       return;
     }
     const newSeed = generateSeed();
     setScores([0, 0]); setLevel(1); setMatchWinner(null);
-    setupLevelFromSeed(newSeed);
-    if (isMultiplayer) {
-      sendMsg({ type: "newMatch", seed: newSeed });
-    }
-  }, [setupLevelFromSeed, isMultiplayer, isHost, sendMsg]);
+    setupAndSyncLevel(newSeed, "newMatch");
+  }, [setupAndSyncLevel, isMultiplayer, isHost, sendMsg]);
 
-  // Init
-  useEffect(() => { setupLevelFromSeed(initialSeed); }, []);
+  // Init — host generates terrain, guest waits for host's levelState message
+  useEffect(() => {
+    if (!isMultiplayer || isHost) {
+      setupAndSyncLevel(initialSeed);
+    }
+    // Guest: apply a temporary blank state, will be overwritten by levelState message
+    if (isMultiplayer && !isHost) {
+      const fallback = generateLevelState(initialSeed);
+      applyLevelState(fallback);
+    }
+  }, []);
 
   // ─── MULTIPLAYER: LISTEN FOR PEER MESSAGES ────────────────
   useEffect(() => {
@@ -338,21 +401,21 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             setP2(v => ({ ...v, angle: data.angle }));
           }
           break;
-        case "newLevel":
-          setLevel(l => l + 1);
-          setupLevelFromSeed(data.seed);
+        case "levelState":
+          // Host sent authoritative terrain + positions — apply directly
+          applyLevelState(data.state);
           break;
         case "newMatch":
+          // Host started new match with full state
           setScores([0, 0]); setLevel(1); setMatchWinner(null);
-          setupLevelFromSeed(data.seed);
+          applyLevelState(data.state);
           break;
         case "requestNewMatch":
-          // Guest requested new match — host generates and sends seed
+          // Guest requested new match — host generates terrain and sends full state
           if (isHost) {
             const newSeed = generateSeed();
             setScores([0, 0]); setLevel(1); setMatchWinner(null);
-            setupLevelFromSeed(newSeed);
-            sendMsg({ type: "newMatch", seed: newSeed });
+            setupAndSyncLevel(newSeed, "newMatch");
           }
           break;
       }
@@ -369,20 +432,21 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     return () => {
       conn.off("data", handleData);
     };
-  }, [isMultiplayer, conn, setupLevelFromSeed]);
+  }, [isMultiplayer, conn, applyLevelState, setupAndSyncLevel]);
 
   // ─── REMOTE FIRE HANDLER ──────────────────────────────────
   // Uses the EXACT projectile state from the firing player — no local recomputation
   const handleRemoteFire = useCallback((data) => {
     const { turn: t, snd: sd } = S.current;
-    const { proj: exactProj, angle, power, tankX, tankY, nextWind } = data;
+    const { proj: exactProj, angle, power, tankX, tankY, nextWind, impact } = data;
 
     // Sync the remote tank's position/angle/power exactly
     if (t === 0) setP1(v => ({ ...v, x: tankX, y: tankY, angle, power }));
     else setP2(v => ({ ...v, x: tankX, y: tankY, angle, power }));
 
-    // Store next wind to apply when the shot resolves
+    // Store authoritative data from firing player
     nextWindRef.current = nextWind;
+    impactRef.current = impact; // { hit, x, y, destroyedIdx }
 
     // Use the exact projectile physics from the firing player
     const p = { x: exactProj.x, y: exactProj.y, vx: exactProj.vx, vy: exactProj.vy };
@@ -454,7 +518,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setCharging(false);
 
     const power = Math.max(10, Math.min(100, Math.floor(((Date.now() - chargeStart.current) / 2000) * 100)));
-    const { turn: t, p1: a, p2: b, snd: sd } = S.current;
+    const { turn: t, p1: a, p2: b, snd: sd, terrain: ter, wind: w } = S.current;
     const tank = t === 0 ? a : b;
     const fr = t === 0;
     const rad = ((fr ? -tank.angle : -(180 - tank.angle)) * Math.PI) / 180;
@@ -469,9 +533,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
     // Pre-compute the next wind value deterministically
     turnCounterRef.current++;
-    const windSeed = currentSeedRef.current + turnCounterRef.current * 7919; // prime multiplier
+    const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
     const nextWind = (createSeededRandom(windSeed)() - 0.5) * 0.08;
     nextWindRef.current = nextWind;
+
+    // ═══ PRE-SIMULATE: find authoritative impact point ═══
+    const impact = simulateTrajectory(p, w, ter, [a, b]);
+    impactRef.current = impact;
 
     setFiringEffect({ tankIdx: t, frame: 0, barrelX, barrelY, angle: rad });
     if (t === 0) setP1(v => ({ ...v, power })); else setP2(v => ({ ...v, power }));
@@ -481,7 +549,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setMsg("💥 INCOMING!");
     if (sd) sfxFire();
 
-    // Send EXACT projectile state + pre-computed next wind to peer
+    // Send EXACT projectile state + authoritative impact + next wind to peer
     if (isMultiplayer) {
       sendMsg({
         type: "fire",
@@ -491,11 +559,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         tankX: tank.x,
         tankY: tank.y,
         nextWind,
+        impact, // authoritative landing point
       });
     }
   }, [isMultiplayer, sendMsg]);
 
   // ─── PROJECTILE FLIGHT ────────────────────────────────────
+  // Animation runs per-frame (visual), but game logic uses authoritative impact.
   useEffect(() => {
     if (phase !== "flying" || !proj) return;
     let pr = { ...projRef.current };
@@ -507,40 +577,61 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       if (fc % 3 === 0) { pts = [...pts, { x: pr.x, y: pr.y }].slice(-30); setTrail([...pts]); }
       setProj({ ...pr });
 
+      // ═══ CAMERA ZOOM ═══
       const terrainY = tY(ter, pr.x);
       const heightAboveTerrain = terrainY - pr.y;
       const distanceToGround = Math.max(0, heightAboveTerrain);
       let targetZoom;
-      if (fc < 30) {
-        targetZoom = 1 + (fc / 30);
-      } else if (distanceToGround < 150) {
-        const zoomProgress = distanceToGround / 150;
-        targetZoom = 1 + zoomProgress;
-      } else {
-        targetZoom = 2;
-      }
+      if (fc < 30) targetZoom = 1 + (fc / 30);
+      else if (distanceToGround < 150) targetZoom = 1 + (distanceToGround / 150);
+      else targetZoom = 2;
       setCameraZoom(targetZoom);
-
-      const verticalOffset = -80;
       const effectiveViewWidth = VIEW_W * targetZoom;
-      const targetViewX = Math.max(0, Math.min(WORLD_W - effectiveViewWidth, pr.x - effectiveViewWidth / 2));
-      setViewportX(targetViewX);
-      setViewportY(verticalOffset);
+      setViewportX(Math.max(0, Math.min(WORLD_W - effectiveViewWidth, pr.x - effectiveViewWidth / 2)));
+      setViewportY(-80);
 
-      if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+      // ═══ RESOLVE: use authoritative impact if available ═══
+      const auth = impactRef.current; // pre-simulated impact from firing player
+
+      // Determine if the visual projectile should resolve this frame
+      let shouldResolveOOB = false;
+      let shouldResolveTerrain = false;
+
+      if (auth) {
+        // MULTIPLAYER or LOCAL with pre-sim: use authoritative result
+        if (auth.hit) {
+          // Auth says terrain hit — resolve when visual catches up
+          if (pr.y >= tY(ter, pr.x) || pr.y >= auth.y) {
+            shouldResolveTerrain = true;
+          }
+        } else {
+          // Auth says OOB
+          if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+            shouldResolveOOB = true;
+          }
+        }
+      } else {
+        // No auth data (shouldn't happen but safety fallback)
+        if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) shouldResolveOOB = true;
+        else if (pr.y >= tY(ter, pr.x)) shouldResolveTerrain = true;
+      }
+
+      // ═══ HANDLE MISS (OOB) ═══
+      if (shouldResolveOOB) {
         setProj(null); setTrail([]);
         setViewportY(0); setCameraZoom(1);
+        impactRef.current = null;
         if (sd) [sfxSplash, sfxOuch, sfxGlass][Math.floor(Math.random() * 3)]();
         addFloat(Math.max(40, Math.min(WORLD_W - 40, pr.x)), 100,
           ["MISS!", "WHOOSH!", "OUCHHHH!", "💨", "NOPE!"][Math.floor(Math.random() * 5)], "#f59e0b");
         const nextTank = t === 0 ? S.current.p2 : S.current.p1;
         setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, nextTank.x - VIEW_W / 2)));
 
-        // Use pre-computed wind (from firing player) for perfect sync
-        if (isMultiplayer && nextWindRef.current !== null) {
+        // Apply pre-computed wind
+        if (nextWindRef.current !== null) {
           setWind(nextWindRef.current);
           nextWindRef.current = null;
-        } else if (!isMultiplayer) {
+        } else {
           turnCounterRef.current++;
           const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
           setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
@@ -555,36 +646,52 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         return;
       }
 
-      const ty = tY(ter, pr.x);
-      if (pr.y >= ty) {
+      // ═══ HANDLE TERRAIN HIT ═══
+      if (shouldResolveTerrain) {
+        // Use AUTHORITATIVE impact coordinates — identical on both sides
+        const impX = auth ? auth.x : pr.x;
+        const impY = auth ? auth.y : tY(ter, pr.x);
+
         setProj(null);
         setViewportY(0); setCameraZoom(1);
         setPhase("impact");
-        setBoom({ x: pr.x, y: ty, frame: 0 });
+        setBoom({ x: impX, y: impY, frame: 0 });
         if (sd) sfxExplosion();
 
-        const newT = crater(ter, pr.x, EXPLOSION_RADIUS);
+        // Crater at authoritative position
+        const newT = crater(ter, impX, EXPLOSION_RADIUS);
         setTerrain(newT);
 
+        // Tree destruction at authoritative position
         const treesBeforeExplosion = S.current.envObjects || [];
         const treesAfterExplosion = treesBeforeExplosion.filter(obj => {
           if (obj.type !== 'tree') return true;
-          const dist = Math.sqrt((obj.x - pr.x) ** 2 + (obj.y - ty) ** 2);
+          const dist = Math.sqrt((obj.x - impX) ** 2 + (obj.y - impY) ** 2);
           return dist > EXPLOSION_RADIUS * 1.2;
         });
         if (treesAfterExplosion.length < treesBeforeExplosion.length) setEnvObjects(treesAfterExplosion);
 
+        // ═══ DAMAGE CHECK at authoritative position ═══
         let hitAny = false;
-        let destroyedIdx = null;
+        let destroyedIdx = auth ? auth.destroyedIdx : null;
+
+        // If no auth data, compute locally (single-player fallback)
+        if (!auth) {
+          const tanks = [a, b];
+          tanks.forEach((tk, i) => {
+            const dist = Math.sqrt((tk.x - impX) ** 2 + (tk.y - impY) ** 2);
+            if (dist < EXPLOSION_RADIUS * 0.6 || dist < EXPLOSION_RADIUS * 1.1) {
+              hitAny = true;
+              destroyedIdx = i;
+            }
+          });
+        } else {
+          hitAny = destroyedIdx !== null;
+        }
+
         const tanks = [a, b];
         const newTanks = tanks.map((tk, i) => {
-          const dist = Math.sqrt((tk.x - pr.x) ** 2 + (tk.y - ty) ** 2);
-          let dmg = 0;
-          if (dist < EXPLOSION_RADIUS * 0.6) dmg = DAMAGE;
-          else if (dist < EXPLOSION_RADIUS * 1.1) dmg = NEAR_DAMAGE;
-          if (dmg > 0) {
-            hitAny = true;
-            destroyedIdx = i;
+          if (i === destroyedIdx) {
             if (i === t) addFloat(tk.x, tk.y - 30, `💀 SELF-DESTRUCT!`, "#ef4444");
             else addFloat(tk.x, tk.y - 30, `💀 DESTROYED!`, "#ef4444");
             if (sd) { sfxHit(); sfxOuch(); }
@@ -594,6 +701,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         });
 
         setP1(newTanks[0]); setP2(newTanks[1]);
+        impactRef.current = null;
 
         if (destroyedIdx !== null) {
           const deadIdx = destroyedIdx;
@@ -605,14 +713,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         } else {
           if (!hitAny) {
             if (sd) [sfxSplash, sfxGlass][Math.floor(Math.random() * 2)]();
-            addFloat(pr.x, ty - 20, "BOOM!", "#f59e0b");
+            addFloat(impX, impY - 20, "BOOM!", "#f59e0b");
           }
 
-          // Use pre-computed wind (from firing player) for perfect sync
-          if (isMultiplayer && nextWindRef.current !== null) {
+          // Apply pre-computed wind
+          if (nextWindRef.current !== null) {
             setWind(nextWindRef.current);
             nextWindRef.current = null;
-          } else if (!isMultiplayer) {
+          } else {
             turnCounterRef.current++;
             const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
             setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
@@ -702,23 +810,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         requestAnimationFrame(ani);
       } else {
         if (S.current.snd) sfxNextLevel();
-        if (!isMultiplayer) {
-          // Single-player: generate new level immediately
+        if (!isMultiplayer || isHost) {
+          // Host or single-player: generate new level + send terrain to guest
           const newSeed = generateSeed();
           setLevel(l => l + 1);
-          setupLevelFromSeed(newSeed);
-        } else if (isHost) {
-          // Multiplayer HOST: generate seed and send to guest
-          const newSeed = generateSeed();
-          setLevel(l => l + 1);
-          setupLevelFromSeed(newSeed);
-          sendMsg({ type: "newLevel", seed: newSeed });
+          setupAndSyncLevel(newSeed);
         }
-        // Multiplayer GUEST: do nothing here, wait for "newLevel" message from host
+        // Multiplayer GUEST: do nothing, wait for "levelState" from host
       }
     };
     requestAnimationFrame(ani);
-  }, [phase === "transition" ? 1 : 0, setupLevelFromSeed]);
+  }, [phase === "transition" ? 1 : 0, setupAndSyncLevel]);
 
   // ─── BARREL & CAMERA DRAG ─────────────────────────────────
   const handleSvgDown = useCallback((e) => {
