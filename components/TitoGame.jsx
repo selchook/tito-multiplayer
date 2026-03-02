@@ -199,13 +199,21 @@ const DEBRIS = Array.from({ length: 14 }, (_, i) => ({
 }));
 
 // ═══════════════════════════════════════════════════════════
-export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, conn, peer, isHost, onDisconnect }) {
+export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, conn, peer, isHost, onDisconnect, myName: myNameProp }) {
   // ─── MULTIPLAYER STATE ────────────────────────────────────
   const [connected, setConnected] = useState(true);
-  const [opponentName, setOpponentName] = useState(myPlayer === 0 ? "P2" : "P1");
+  const myName = myNameProp || (myPlayer === 0 ? "P1" : "P2");
+  const [opponentName, setOpponentName] = useState(null);
   const currentSeedRef = useRef(initialSeed);
   const connRef = useRef(conn);
   connRef.current = conn;
+
+  // Exchange names on connect
+  useEffect(() => {
+    if (!isMultiplayer || !conn) return;
+    // Send our name to peer
+    try { conn.send({ type: "name", name: myName }); } catch (e) {}
+  }, [isMultiplayer, conn, myName]);
 
   // Send message to peer
   const sendMsg = useCallback((data) => {
@@ -376,6 +384,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
     const handleData = (data) => {
       switch (data.type) {
+        case "name":
+          // Opponent sent their name
+          setOpponentName(data.name);
+          // Reply with our name in case they connected after us
+          try { connRef.current?.send({ type: "name", name: myName }); } catch (e) {}
+          break;
         case "fire":
           // Remote player fired — use their EXACT projectile state
           handleRemoteFire(data);
@@ -945,15 +959,16 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const dColors = killData ? (killData.deadIdx === 0 ? [P1.main, P1.accent] : [P2.main, P2.accent]) : ["#fff", "#fff"];
 
   // Player labels for multiplayer
-  const p1Name = isMultiplayer ? (myPlayer === 0 ? "YOU" : "OPP") : "P1";
-  const p2Name = isMultiplayer ? (myPlayer === 1 ? "YOU" : "OPP") : "P2";
+  const oppDisplay = opponentName || (myPlayer === 0 ? "P2" : "P1");
+  const p1Name = isMultiplayer ? (myPlayer === 0 ? myName : oppDisplay) : "P1";
+  const p2Name = isMultiplayer ? (myPlayer === 1 ? myName : oppDisplay) : "P2";
 
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
       
       {/* MULTIPLAYER CONNECTION STATUS BAR */}
       {isMultiplayer && (
-        <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 16px", boxSizing: "border-box", background: connected ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", borderBottom: `1px solid ${connected ? "#166534" : "#991b1b"}` }}>
+        <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 12px", boxSizing: "border-box", background: connected ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", borderBottom: `1px solid ${connected ? "#166534" : "#991b1b"}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: connected ? "#22c55e" : "#ef4444" }} />
             <span style={{ fontSize: 10, color: connected ? "#22c55e" : "#ef4444" }}>
@@ -961,7 +976,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             </span>
           </div>
           <span style={{ fontSize: 10, color: "#64748b" }}>
-            YOU ARE {myPlayer === 0 ? "P1 🔵" : "P2 🔴"}
+            YOU: <span style={{ color: myPlayer === 0 ? P1.accent : P2.accent, fontWeight: 700 }}>{myName}</span>
           </span>
           <button onClick={onDisconnect} style={{ fontSize: 9, color: "#64748b", background: "none", border: "1px solid #334155", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontFamily: "monospace" }}>
             EXIT
@@ -969,21 +984,40 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </div>
       )}
 
-      {/* HEADER */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", boxSizing: "border-box" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: 4, background: "linear-gradient(135deg,#06b6d4,#f43f5e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>TITO'NUN TANKI</div>
-          <span style={{ fontSize: 10, color: "#475569" }}>LVL {level}</span>
-          <span style={{ fontSize: 10, color: "#334155" }}>FIRST TO {WIN_SCORE}</span>
+      {/* HEADER — mobile-friendly stacked layout */}
+      <div style={{ width: "100%", maxWidth: 820, padding: "6px 12px", boxSizing: "border-box" }}>
+        {/* Top row: title + sound */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 3, background: "linear-gradient(135deg,#06b6d4,#f43f5e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>TITO'NUN TANKI</div>
+            <span style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>LVL {level}</span>
+          </div>
+          <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>{snd ? "🔊" : "🔇"}</button>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "4px 10px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 16 }}>{snd ? "🔊" : "🔇"}</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: P1.main }}>{p1Name}</span>
-            <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < scores[0] ? P1.accent : "#1e293b", border: `1px solid ${i < scores[0] ? P1.main : "#334155"}` }} />)}</div>
-            <span style={{ color: "#334155" }}>|</span>
-            <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < scores[1] ? P2.accent : "#1e293b", border: `1px solid ${i < scores[1] ? P2.main : "#334155"}` }} />)}</div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: P2.main }}>{p2Name}</span>
+
+        {/* Scoreboard row: P1 score | vs | P2 score — full width */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, background: "rgba(15,23,42,0.6)", borderRadius: 8, padding: "6px 8px", border: "1px solid #1e293b" }}>
+          {/* P1 side */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: P1.accent, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p1Name}</span>
+              {isMultiplayer && myPlayer === 0 && <span style={{ fontSize: 7, color: P1.main, letterSpacing: 1 }}>YOU</span>}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: P1.accent, minWidth: 20, textAlign: "center" }}>{scores[0]}</div>
+            <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i < scores[0] ? P1.accent : "#1e293b", border: `1px solid ${i < scores[0] ? P1.main : "#334155"}`, flexShrink: 0 }} />)}</div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ padding: "0 8px", fontSize: 10, color: "#475569", fontWeight: 700 }}>VS</div>
+
+          {/* P2 side */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-start" }}>
+            <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i < scores[1] ? P2.accent : "#1e293b", border: `1px solid ${i < scores[1] ? P2.main : "#334155"}`, flexShrink: 0 }} />)}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: P2.accent, minWidth: 20, textAlign: "center" }}>{scores[1]}</div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: P2.accent, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p2Name}</span>
+              {isMultiplayer && myPlayer === 1 && <span style={{ fontSize: 7, color: P2.main, letterSpacing: 1 }}>YOU</span>}
+            </div>
           </div>
         </div>
       </div>
@@ -1154,12 +1188,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             );
           })()}
 
-          {phase === "celebration" && matchWinner !== null && <CelebrationG winner={matchWinner} scores={scores} onNew={startNewMatch} viewportX={viewportX} isMultiplayer={isMultiplayer} myPlayer={myPlayer} />}
+          {phase === "celebration" && matchWinner !== null && <CelebrationG winner={matchWinner} scores={scores} onNew={startNewMatch} viewportX={viewportX} isMultiplayer={isMultiplayer} myPlayer={myPlayer} p1Name={p1Name} p2Name={p2Name} />}
         </svg>
       </div>
 
       {/* CONTROLS */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", boxSizing: "border-box", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "center", alignItems: "center", padding: "8px 10px", boxSizing: "border-box", gap: 8, flexWrap: "wrap" }}>
         {canAct && (
           <div style={{ display: "flex", gap: 4 }}>
             <button onClick={() => { const tk = turn === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }} title="View your tank">👁️ ME</button>
@@ -1171,7 +1205,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         {isMultiplayer && !isMyTurn && phase === "aiming" && matchWinner === null && (
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button onClick={() => { const tk = myPlayer === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>👁️ ME</button>
-            <button onClick={() => { const oppTank = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>🎯 OPP</button>
+            <button onClick={() => { const oppTank = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>🎯 {oppDisplay.slice(0, 5)}</button>
           </div>
         )}
 
@@ -1245,14 +1279,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
       {/* HP + Score */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", padding: "2px 16px", boxSizing: "border-box" }}>
+      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", padding: "2px 12px", boxSizing: "border-box", gap: 8 }}>
         {[{ t: p1, c: P1, s: scores[0], n: p1Name }, { t: p2, c: P2, s: scores[1], n: p2Name }].map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, flexDirection: i === 1 ? "row-reverse" : "row" }}>
-            <span style={{ fontSize: 11, color: d.c.main, fontWeight: 700 }}>{d.n}</span>
-            <div style={{ width: 100, height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${d.t.hp}%`, borderRadius: 3, background: `linear-gradient(90deg,${d.c.main},${d.c.accent})`, transition: "width 0.3s" }} /></div>
-            <span style={{ fontSize: 10, color: "#64748b" }}>{d.t.hp}</span>
-            <span style={{ fontSize: 12, fontWeight: 900, color: d.c.accent }}>{d.s}</span>
-            <span style={{ fontSize: 8, color: "#475569" }}>PTS</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: i === 1 ? "row-reverse" : "row", flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 10, color: d.c.main, fontWeight: 700, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>{d.n}</span>
+            <div style={{ flex: 1, minWidth: 40, maxWidth: 80, height: 5, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${d.t.hp}%`, borderRadius: 3, background: `linear-gradient(90deg,${d.c.main},${d.c.accent})`, transition: "width 0.3s" }} /></div>
+            <span style={{ fontSize: 9, color: "#64748b", flexShrink: 0 }}>{d.t.hp}</span>
           </div>
         ))}
       </div>
@@ -1335,7 +1367,7 @@ function TankG({ t, c, name, active, fr, recoil = 0 }) {
 }
 
 // ─── CELEBRATION COMPONENT ──────────────────────────────────
-function CelebrationG({ winner, scores, onNew, viewportX, isMultiplayer, myPlayer }) {
+function CelebrationG({ winner, scores, onNew, viewportX, isMultiplayer, myPlayer, p1Name, p2Name }) {
   const [conf] = useState(() => Array.from({ length: 60 }, (_, i) => ({ x: Math.random() * VIEW_W, dl: Math.random() * 2, sp: 1 + Math.random() * 2, sz: 4 + Math.random() * 8, cl: ["#06b6d4", "#f43f5e", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#fff"][i % 7], wb: Math.random() * 4 - 2, rt: Math.random() * 360 })));
   const [fr, setFr] = useState(0);
   useEffect(() => { let f = 0; const a = () => { f++; setFr(f); if (f < 300) requestAnimationFrame(a); }; requestAnimationFrame(a); }, []);
@@ -1343,8 +1375,8 @@ function CelebrationG({ winner, scores, onNew, viewportX, isMultiplayer, myPlaye
   const wa = winner === 0 ? "#06b6d4" : "#f43f5e";
   const centerX = viewportX + VIEW_W / 2;
   const winnerText = isMultiplayer
-    ? (winner === myPlayer ? "YOU WIN!" : "OPPONENT WINS!")
-    : `PLAYER ${winner + 1} CHAMPION!`;
+    ? (winner === myPlayer ? "YOU WIN!" : `${(winner === 0 ? p1Name : p2Name) || "OPPONENT"} WINS!`)
+    : `${winner === 0 ? (p1Name || "P1") : (p2Name || "P2")} CHAMPION!`;
   return (
     <g>
       <rect x={viewportX} y="0" width={VIEW_W} height={H} fill="#000" opacity="0.75" />
