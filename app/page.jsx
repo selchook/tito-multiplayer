@@ -218,8 +218,34 @@ function Lobby({ onGameStart }) {
 
       {!mode && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, width: 320 }}>
+          {[
+            { label: "Player 1 (You)", value: p1Name, set: setP1Name, color: "#06b6d4" },
+            { label: "Player 2 (Opponent)", value: p2Name, set: setP2Name, color: "#f43f5e" },
+          ].map(({ label, value, set, color }) => (
+            <input
+              key={label}
+              value={value}
+              onChange={(e) => set(e.target.value)}
+              placeholder={label}
+              maxLength={16}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 10,
+                border: `2px solid ${color}44`,
+                background: "#1e293b",
+                color: "#e2e8f0",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "monospace",
+                outline: "none",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+          ))}
+          <div style={{ borderTop: "1px solid #1e293b", margin: "4px 0" }} />
           <button
-            onClick={() => setMode("create")}
+            onClick={() => { setMode("create"); handleCreate(); }}
             style={{
               padding: "18px 24px",
               borderRadius: 12,
@@ -289,55 +315,6 @@ function Lobby({ onGameStart }) {
             width: 360,
           }}
         >
-          {!roomCode && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-              <div style={{ fontSize: 12, color: "#64748b", letterSpacing: 2, textAlign: "center" }}>PLAYER NAMES</div>
-              {[
-                { label: "Player 1 (You)", value: p1Name, set: setP1Name, color: "#06b6d4" },
-                { label: "Player 2 (Opponent)", value: p2Name, set: setP2Name, color: "#f43f5e" },
-              ].map(({ label, value, set, color }) => (
-                <input
-                  key={label}
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  placeholder={label}
-                  maxLength={16}
-                  style={{
-                    padding: "12px 16px",
-                    borderRadius: 10,
-                    border: `2px solid ${color}44`,
-                    background: "#1e293b",
-                    color: "#e2e8f0",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    fontFamily: "monospace",
-                    outline: "none",
-                    width: "100%",
-                    boxSizing: "border-box",
-                  }}
-                />
-              ))}
-              <button
-                onClick={handleCreate}
-                style={{
-                  padding: "14px 24px",
-                  borderRadius: 10,
-                  border: "2px solid #06b6d4",
-                  background: "linear-gradient(135deg,#0891b2,#06b6d4)",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 900,
-                  fontFamily: "monospace",
-                  letterSpacing: 2,
-                  cursor: "pointer",
-                  marginTop: 4,
-                }}
-              >
-                CREATE ROOM →
-              </button>
-            </div>
-          )}
-
           {roomCode && (
             <>
               <div style={{ fontSize: 12, color: "#64748b", letterSpacing: 2 }}>ROOM CODE</div>
