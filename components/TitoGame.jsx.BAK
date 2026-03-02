@@ -1,7 +1,9 @@
+"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createSeededRandom, generateSeed } from "../lib/seededRandom";
 
-const WORLD_W = 2400; // Total world width (3x bigger)
-const VIEW_W = 800;   // Viewport width (what player sees)
+const WORLD_W = 2400;
+const VIEW_W = 800;
 const H = 500;
 const GRAVITY = 0.15;
 const EXPLOSION_RADIUS = 35;
@@ -10,9 +12,6 @@ const DAMAGE = 35;
 const NEAR_DAMAGE = 18;
 const WIN_SCORE = 10;
 const DESTROY_FRAMES = 55;
-
-// ─── ONE-HIT DESTRUCTION SYSTEM ────────────────────
-// Any hit destroys a tank - opponent OR self!
 
 // ─── SOUND ENGINE ───────────────────────────────────────────
 const AC = typeof window !== "undefined" ? (window.AudioContext || window.webkitAudioContext) : null;
@@ -24,22 +23,16 @@ function sfxDestroy() { const c = ctx(); if (!c) return; const b = c.createBuffe
 function sfxFire() { 
   const c = ctx(); 
   if (!c) return; 
-  
-  // ═══ REALISTIC TANK CANNON FIRE ═══
-  
-  // 1. DEEP BASS BOOM (Main cannon blast)
   const boom = c.createOscillator();
   const boomGain = c.createGain();
   boom.type = "sine";
-  boom.frequency.setValueAtTime(60, c.currentTime); // Deep bass
+  boom.frequency.setValueAtTime(60, c.currentTime);
   boom.frequency.exponentialRampToValueAtTime(30, c.currentTime + 0.15);
   boomGain.gain.setValueAtTime(0.8, c.currentTime);
   boomGain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.4);
   boom.connect(boomGain).connect(c.destination);
   boom.start();
   boom.stop(c.currentTime + 0.4);
-  
-  // 2. MID-RANGE PUNCH (Cannon barrel)
   const punch = c.createOscillator();
   const punchGain = c.createGain();
   punch.type = "triangle";
@@ -50,8 +43,6 @@ function sfxFire() {
   punch.connect(punchGain).connect(c.destination);
   punch.start();
   punch.stop(c.currentTime + 0.25);
-  
-  // 3. SHARP CRACK (Shockwave)
   const crack = c.createOscillator();
   const crackGain = c.createGain();
   crack.type = "sawtooth";
@@ -62,13 +53,11 @@ function sfxFire() {
   crack.connect(crackGain).connect(c.destination);
   crack.start();
   crack.stop(c.currentTime + 0.1);
-  
-  // 4. WHITE NOISE BURST (Explosive gas)
   const noiseBuffer = c.createBuffer(1, c.sampleRate * 0.3, c.sampleRate);
   const noiseData = noiseBuffer.getChannelData(0);
   for (let i = 0; i < noiseData.length; i++) {
     const t = i / c.sampleRate;
-    const envelope = Math.exp(-t * 12); // Fast decay
+    const envelope = Math.exp(-t * 12);
     noiseData[i] = (Math.random() * 2 - 1) * envelope * 0.7;
   }
   const noiseSource = c.createBufferSource();
@@ -77,8 +66,6 @@ function sfxFire() {
   noiseGain.gain.value = 0.6;
   noiseSource.connect(noiseGain).connect(c.destination);
   noiseSource.start();
-  
-  // 5. LOW RUMBLE (Echo/reverb)
   setTimeout(() => {
     if (!c) return;
     const rumble = c.createOscillator();
@@ -92,8 +79,6 @@ function sfxFire() {
     rumble.start();
     rumble.stop(c.currentTime + 0.6);
   }, 100);
-  
-  // 6. METALLIC RING (Barrel vibration)
   setTimeout(() => {
     if (!c) return;
     const ring = c.createOscillator();
@@ -116,54 +101,49 @@ function sfxFanfare() { const c = ctx(); if (!c) return; [523, 587, 659, 784, 65
 function sfxRoundWin() { const c = ctx(); if (!c) return; [523, 659, 784].forEach((f, i) => setTimeout(() => { if (!c) return; const o = c.createOscillator(); const g = c.createGain(); o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0.12, c.currentTime); g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.25); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.25); }, i * 120)); }
 function sfxNextLevel() { const c = ctx(); if (!c) return; const o = c.createOscillator(); const g = c.createGain(); o.type = "sine"; o.frequency.setValueAtTime(400, c.currentTime); o.frequency.exponentialRampToValueAtTime(800, c.currentTime + 0.3); g.gain.setValueAtTime(0.1, c.currentTime); g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.35); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.35); }
 
-// ─── TERRAIN ────────────────────────────────────────────────
-function genTerrain() {
+// ─── TERRAIN (SEEDED) ──────────────────────────────────────
+function genTerrain(rng) {
+  const r = rng || Math.random;
   const pts = new Array(WORLD_W).fill(0), base = H * 0.45;
-  const a1 = 80 + Math.random() * 60, a2 = 40 + Math.random() * 30, a3 = 15 + Math.random() * 15;
-  const f1 = 0.003 + Math.random() * 0.004, f2 = 0.008 + Math.random() * 0.006, f3 = 0.02 + Math.random() * 0.015;
-  const o = Math.random() * 1000;
+  const a1 = 80 + r() * 60, a2 = 40 + r() * 30, a3 = 15 + r() * 15;
+  const f1 = 0.003 + r() * 0.004, f2 = 0.008 + r() * 0.006, f3 = 0.02 + r() * 0.015;
+  const o = r() * 1000;
   for (let x = 0; x < WORLD_W; x++) pts[x] = base + Math.sin((x + o) * f1) * a1 + Math.sin((x + o) * f2) * a2 + Math.sin((x + o) * f3) * a3;
   return pts;
 }
 
-// Create flat plain area for tank movement
 function createPlain(terrain, centerX, width = 50) {
   const halfWidth = Math.floor(width / 2);
   const startX = Math.max(0, centerX - halfWidth);
   const endX = Math.min(WORLD_W - 1, centerX + halfWidth);
   const avgY = terrain[centerX];
-  for (let x = startX; x <= endX; x++) {
-    terrain[x] = avgY;
-  }
+  for (let x = startX; x <= endX; x++) terrain[x] = avgY;
   return terrain;
 }
 
-// ─── ENVIRONMENT OBJECTS ────────────────────────────────────
-function genEnvironment(terrain) {
+function genEnvironment(terrain, rng) {
+  const r = rng || Math.random;
   const objects = [];
-  
-  // Generate trees (30-40 scattered across world)
-  const treeCount = 30 + Math.floor(Math.random() * 11);
+  const treeCount = 30 + Math.floor(r() * 11);
   for (let i = 0; i < treeCount; i++) {
-    const x = 100 + Math.random() * (WORLD_W - 200);
+    const x = 100 + r() * (WORLD_W - 200);
     const y = terrain[Math.floor(x)];
-    const size = 15 + Math.random() * 20; // 15-35px tall
-    const type = Math.random() > 0.5 ? 'pine' : 'round';
-    const hue = 100 + Math.random() * 40; // Green variations
+    const size = 15 + r() * 20;
+    const type = r() > 0.5 ? 'pine' : 'round';
+    const hue = 100 + r() * 40;
     objects.push({ type: 'tree', x, y, size, treeType: type, hue });
   }
-  
   return objects;
 }
 
 function tY(t, x) { return t[Math.floor(Math.max(0, Math.min(x, t.length - 1)))]; }
 function tPath(t) { 
-  const bottomY = H * 3; // Extend terrain fill far down to cover any zoom level
-  let d = `M 0 ${bottomY}`; 
-  d += ` L 0 ${t[0]}`; // Go up to terrain start
-  for (let x = 0; x < t.length; x += 2) d += ` L ${x} ${t[x]}`; // Draw terrain line
-  d += ` L ${t.length} ${bottomY}`; // Go down to bottom at end
-  return d + ` Z`; // Close path
+  const bottomY = H * 3;
+  let d = `M 0 ${bottomY}`;
+  d += ` L 0 ${t[0]}`;
+  for (let x = 0; x < t.length; x += 2) d += ` L ${x} ${t[x]}`;
+  d += ` L ${t.length} ${bottomY}`;
+  return d + ` Z`;
 }
 function crater(terrain, cx, r) {
   const n = [...terrain];
@@ -178,7 +158,38 @@ function crater(terrain, cx, r) {
 const P1 = { main: "#06b6d4", accent: "#22d3ee", glow: "rgba(6,182,212,0.3)" };
 const P2 = { main: "#f43f5e", accent: "#fb7185", glow: "rgba(244,63,94,0.3)" };
 
-// ─── DEBRIS DATA (stable across renders) ────────────────────
+// ─── PRE-SIMULATE TRAJECTORY (deterministic, frame-rate independent) ────
+// Runs the EXACT same physics loop as fly() but synchronously.
+// Returns the authoritative impact point that both sides must use.
+function simulateTrajectory(startProj, wind, terrain, tanks) {
+  let pr = { x: startProj.x, y: startProj.y, vx: startProj.vx, vy: startProj.vy };
+  for (let i = 0; i < 15000; i++) {
+    pr.vx += wind;
+    pr.vy += GRAVITY;
+    pr.x += pr.vx;
+    pr.y += pr.vy;
+    // Out of bounds
+    if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+      return { hit: false, x: pr.x, y: pr.y };
+    }
+    // Terrain collision
+    const ty = tY(terrain, pr.x);
+    if (pr.y >= ty) {
+      // Determine which tank is destroyed (if any)
+      let destroyedIdx = null;
+      if (tanks) {
+        for (let ti = 0; ti < tanks.length; ti++) {
+          const dist = Math.sqrt((tanks[ti].x - pr.x) ** 2 + (tanks[ti].y - ty) ** 2);
+          if (dist < EXPLOSION_RADIUS * 0.6) { destroyedIdx = ti; break; }
+          else if (dist < EXPLOSION_RADIUS * 1.1) { destroyedIdx = ti; }
+        }
+      }
+      return { hit: true, x: pr.x, y: ty, destroyedIdx };
+    }
+  }
+  return { hit: false, x: pr.x, y: pr.y }; // safety fallback
+}
+
 const DEBRIS = Array.from({ length: 14 }, (_, i) => ({
   angle: (i * Math.PI * 2) / 14 + (Math.random() - 0.5) * 0.5,
   speed: 40 + Math.random() * 50,
@@ -188,40 +199,64 @@ const DEBRIS = Array.from({ length: 14 }, (_, i) => ({
 }));
 
 // ═══════════════════════════════════════════════════════════
-export default function TitoGame() {
+export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, conn, peer, isHost, onDisconnect }) {
+  // ─── MULTIPLAYER STATE ────────────────────────────────────
+  const [connected, setConnected] = useState(true);
+  const [opponentName, setOpponentName] = useState(myPlayer === 0 ? "P2" : "P1");
+  const currentSeedRef = useRef(initialSeed);
+  const connRef = useRef(conn);
+  connRef.current = conn;
+
+  // Send message to peer
+  const sendMsg = useCallback((data) => {
+    try {
+      if (connRef.current?.open) {
+        connRef.current.send(data);
+      }
+    } catch (e) {
+      console.error("Send error:", e);
+    }
+  }, []);
+
   // ─── CORE STATE ───────────────────────────────────────────
-  const [terrain, setTerrain] = useState(() => genTerrain());
-  const [envObjects, setEnvObjects] = useState(() => genEnvironment(genTerrain()));
+  const [terrain, setTerrain] = useState(() => {
+    const rng = createSeededRandom(initialSeed);
+    return genTerrain(rng);
+  });
+  const [envObjects, setEnvObjects] = useState(() => {
+    const rng = createSeededRandom(initialSeed);
+    const t = genTerrain(rng);
+    return genEnvironment(t, rng);
+  });
   const [p1, setP1] = useState({ x: 0, y: 0, angle: 60, power: 50, hp: MAX_HP });
   const [p2, setP2] = useState({ x: 0, y: 0, angle: 60, power: 50, hp: MAX_HP });
-  const [p1Plain, setP1Plain] = useState({ minX: 0, maxX: 50 }); // Movement range for P1 (50px)
-  const [p2Plain, setP2Plain] = useState({ minX: 2350, maxX: 2400 }); // Movement range for P2 (50px)
-  const [turn, setTurn] = useState(0); // 0 = p1, 1 = p2
+  const [p1Plain, setP1Plain] = useState({ minX: 0, maxX: 50 });
+  const [p2Plain, setP2Plain] = useState({ minX: 2350, maxX: 2400 });
+  const [turn, setTurn] = useState(0);
   const [scores, setScores] = useState([0, 0]);
   const [level, setLevel] = useState(1);
-  const [wind, setWind] = useState(() => (Math.random() - 0.5) * 0.08);
+  const [wind, setWind] = useState(0);
   const [snd, setSnd] = useState(true);
 
-  // ─── PHASE STATE ──────────────────────────────────────────
-  const [phase, setPhase] = useState("aiming"); // aiming|flying|impact|destroying|transition|celebration
+  const [phase, setPhase] = useState("aiming");
   const [proj, setProj] = useState(null);
   const [trail, setTrail] = useState([]);
-  const [boom, setBoom] = useState(null); // {x, y, frame}
-  const [killData, setKillData] = useState(null); // {deadIdx, winner, x, y, frame}
-  const [transData, setTransData] = useState(null); // {winner, level, frame}
+  const [boom, setBoom] = useState(null);
+  const [killData, setKillData] = useState(null);
+  const [transData, setTransData] = useState(null);
   const [matchWinner, setMatchWinner] = useState(null);
   const [msg, setMsg] = useState("PLAYER 1 — HOLD 🔥 TO CHARGE!");
   const [floats, setFloats] = useState([]);
   const [charging, setCharging] = useState(false);
   const [chargeProg, setChargeProg] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [viewportX, setViewportX] = useState(0); // Camera position
-  const [viewportY, setViewportY] = useState(0); // Vertical camera offset
+  const [viewportX, setViewportX] = useState(0);
+  const [viewportY, setViewportY] = useState(0);
   const [cameraDragging, setCameraDragging] = useState(false);
   const [minimapDragging, setMinimapDragging] = useState(false);
-  const [tankMoving, setTankMoving] = useState(0); // -1 = left, 0 = stopped, 1 = right
-  const [firingEffect, setFiringEffect] = useState(null); // {tankIdx, frame, barrelX, barrelY}
-  const [cameraZoom, setCameraZoom] = useState(1); // 1 = normal, 2 = zoomed out 2x
+  const [tankMoving, setTankMoving] = useState(0);
+  const [firingEffect, setFiringEffect] = useState(null);
+  const [cameraZoom, setCameraZoom] = useState(1);
 
   const projRef = useRef(null);
   const animRef = useRef(null);
@@ -233,12 +268,20 @@ export default function TitoGame() {
   const dragSA = useRef(0);
   const cameraDragStartX = useRef(0);
   const cameraStartViewportX = useRef(0);
-  // Keep latest state in ref for rAF access
+  const nextWindRef = useRef(null); // Pre-computed wind for next turn (multiplayer sync)
+  const turnCounterRef = useRef(0); // Deterministic turn counter for wind seeds
+  const impactRef = useRef(null); // Authoritative impact point (multiplayer sync)
   const S = useRef({});
   S.current = { terrain, p1, p2, turn, scores, level, wind, snd, phase, cameraZoom, envObjects };
   chargingRef.current = charging;
 
-  const [clouds] = useState(() => Array.from({ length: 15 }, () => ({ x: Math.random() * WORLD_W, y: 20 + Math.random() * 60, s: 0.5 + Math.random() * 0.8 })));
+  const [clouds] = useState(() => {
+    const rng = createSeededRandom(initialSeed + 999);
+    return Array.from({ length: 15 }, () => ({ x: rng() * WORLD_W, y: 20 + rng() * 60, s: 0.5 + rng() * 0.8 }));
+  });
+
+  // ─── MULTIPLAYER: IS IT MY TURN? ─────────────────────────
+  const isMyTurn = !isMultiplayer || turn === myPlayer;
 
   // ─── HELPERS ──────────────────────────────────────────────
   const addFloat = useCallback((x, y, text, color) => {
@@ -247,67 +290,193 @@ export default function TitoGame() {
     setTimeout(() => setFloats(f => f.filter(v => v.id !== id)), 1300);
   }, []);
 
-  const newWind = () => (Math.random() - 0.5) * 0.08;
+  const getPowerMultiplier = useCallback(() => 0.245, []);
 
-  // ─── POWER SCALING ────────────────────────────────────────
-  const getPowerMultiplier = useCallback(() => {
-    // Fixed max range: 4000px at 100% power
-    // Physics: range = v² / gravity
-    // 4000 = (100 * multiplier)² / 0.15
-    // Solving: multiplier = √(4000 * 0.15) / 100 ≈ 0.245
-    return 0.245;
-  }, []);
-
-  // ─── SETUP LEVEL ──────────────────────────────────────────
-  const setupLevel = useCallback(() => {
-    let t = genTerrain();
-    // Position tanks far apart in the bigger world
-    const x1 = 200 + Math.random() * 200;
-    const x2 = WORLD_W - 200 - Math.random() * 200;
-    
-    // Create 50px flat plains for tank movement
+  // ─── GENERATE LEVEL STATE (pure function, returns data) ───
+  const generateLevelState = useCallback((seed) => {
+    const rng = createSeededRandom(seed);
+    let t = genTerrain(rng);
+    const x1 = Math.floor(200 + rng() * 200);
+    const x2 = Math.floor(WORLD_W - 200 - rng() * 200);
     t = createPlain(t, x1, 50);
     t = createPlain(t, x2, 50);
-    
-    setTerrain(t);
-    setEnvObjects(genEnvironment(t)); // Generate new environment for new terrain
-    
-    // Set tank positions at center of their plains
-    setP1({ x: x1, y: t[Math.floor(x1)], angle: 60, power: 50, hp: MAX_HP });
-    setP2({ x: x2, y: t[Math.floor(x2)], angle: 60, power: 50, hp: MAX_HP });
-    
-    // Set movement ranges (±25px from center)
-    setP1Plain({ minX: x1 - 25, maxX: x1 + 25 });
-    setP2Plain({ minX: x2 - 25, maxX: x2 + 25 });
-    
-    setTurn(0);
-    setWind(newWind());
-    setPhase("aiming");
-    setProj(null); setTrail([]); setBoom(null); setKillData(null); setTransData(null);
-    setMsg("PLAYER 1 — HOLD 🔥 TO CHARGE!");
-    setFloats([]); setCharging(false); setChargeProg(0);
-    // Reset camera
-    setCameraZoom(1);
-    setViewportY(0);
-    // Center viewport on player 1's tank
-    setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, x1 - VIEW_W / 2)));
+    const env = genEnvironment(t, rng);
+    const w = (rng() - 0.5) * 0.08;
+    return {
+      terrain: t,
+      envObjects: env,
+      p1: { x: x1, y: t[x1], angle: 60, power: 50, hp: MAX_HP },
+      p2: { x: x2, y: t[x2], angle: 60, power: 50, hp: MAX_HP },
+      p1Plain: { minX: x1 - 25, maxX: x1 + 25 },
+      p2Plain: { minX: x2 - 25, maxX: x2 + 25 },
+      wind: w,
+      seed,
+    };
   }, []);
 
-  const startNewMatch = useCallback(() => {
-    setScores([0, 0]); setLevel(1); setMatchWinner(null); setupLevel();
-  }, [setupLevel]);
+  // ─── APPLY LEVEL STATE (sets all React state from data) ───
+  const applyLevelState = useCallback((state) => {
+    setTerrain(state.terrain);
+    setEnvObjects(state.envObjects);
+    setP1(state.p1);
+    setP2(state.p2);
+    setP1Plain(state.p1Plain);
+    setP2Plain(state.p2Plain);
+    setWind(state.wind);
+    setTurn(0);
+    setPhase("aiming");
+    setProj(null); setTrail([]); setBoom(null); setKillData(null); setTransData(null);
+    setMsg(isMultiplayer && myPlayer === 0 ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : isMultiplayer ? "OPPONENT'S TURN — WAIT..." : "PLAYER 1 — HOLD 🔥 TO CHARGE!");
+    setFloats([]); setCharging(false); setChargeProg(0);
+    setCameraZoom(1);
+    setViewportY(0);
+    turnCounterRef.current = 0;
+    nextWindRef.current = null;
+    impactRef.current = null;
+    currentSeedRef.current = state.seed || 0;
+    setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, state.p1.x - VIEW_W / 2)));
+  }, [isMultiplayer, myPlayer]);
 
-  // Init
-  useEffect(() => { setupLevel(); }, []);
+  // ─── SETUP + SYNC LEVEL ───────────────────────────────────
+  // Host generates and sends full state to guest. Guest never generates terrain.
+  const setupAndSyncLevel = useCallback((seed, msgType = "levelState") => {
+    const state = generateLevelState(seed);
+    applyLevelState(state);
+    // Host sends the actual terrain data to guest — no independent generation
+    if (isMultiplayer && isHost) {
+      sendMsg({ type: msgType, state });
+    }
+  }, [generateLevelState, applyLevelState, isMultiplayer, isHost, sendMsg]);
+
+  const startNewMatch = useCallback(() => {
+    if (isMultiplayer && !isHost) {
+      sendMsg({ type: "requestNewMatch" });
+      return;
+    }
+    const newSeed = generateSeed();
+    setScores([0, 0]); setLevel(1); setMatchWinner(null);
+    setupAndSyncLevel(newSeed, "newMatch");
+  }, [setupAndSyncLevel, isMultiplayer, isHost, sendMsg]);
+
+  // Init — host generates terrain, guest waits for host's levelState message
+  useEffect(() => {
+    if (!isMultiplayer || isHost) {
+      setupAndSyncLevel(initialSeed);
+    }
+    // Guest: apply a temporary blank state, will be overwritten by levelState message
+    if (isMultiplayer && !isHost) {
+      const fallback = generateLevelState(initialSeed);
+      applyLevelState(fallback);
+    }
+  }, []);
+
+  // ─── MULTIPLAYER: LISTEN FOR PEER MESSAGES ────────────────
+  useEffect(() => {
+    if (!isMultiplayer || !conn) return;
+
+    const handleData = (data) => {
+      switch (data.type) {
+        case "fire":
+          // Remote player fired — use their EXACT projectile state
+          handleRemoteFire(data);
+          break;
+        case "move":
+          // Remote player moved their tank
+          if (data.player === 0) {
+            setP1(v => {
+              const ter = S.current.terrain;
+              return { ...v, x: data.x, y: ter[Math.floor(data.x)] };
+            });
+          } else {
+            setP2(v => {
+              const ter = S.current.terrain;
+              return { ...v, x: data.x, y: ter[Math.floor(data.x)] };
+            });
+          }
+          break;
+        case "angle":
+          if (data.player === 0) {
+            setP1(v => ({ ...v, angle: data.angle }));
+          } else {
+            setP2(v => ({ ...v, angle: data.angle }));
+          }
+          break;
+        case "levelState":
+          // Host sent authoritative terrain + positions — apply directly
+          applyLevelState(data.state);
+          break;
+        case "newMatch":
+          // Host started new match with full state
+          setScores([0, 0]); setLevel(1); setMatchWinner(null);
+          applyLevelState(data.state);
+          break;
+        case "requestNewMatch":
+          // Guest requested new match — host generates terrain and sends full state
+          if (isHost) {
+            const newSeed = generateSeed();
+            setScores([0, 0]); setLevel(1); setMatchWinner(null);
+            setupAndSyncLevel(newSeed, "newMatch");
+          }
+          break;
+      }
+    };
+
+    conn.on("data", handleData);
+    conn.on("close", () => {
+      setConnected(false);
+    });
+    conn.on("error", () => {
+      setConnected(false);
+    });
+
+    return () => {
+      conn.off("data", handleData);
+    };
+  }, [isMultiplayer, conn, applyLevelState, setupAndSyncLevel]);
+
+  // ─── REMOTE FIRE HANDLER ──────────────────────────────────
+  // Uses the EXACT projectile state from the firing player — no local recomputation
+  const handleRemoteFire = useCallback((data) => {
+    const { turn: t, snd: sd } = S.current;
+    const { proj: exactProj, angle, power, tankX, tankY, nextWind, impact } = data;
+
+    // Sync the remote tank's position/angle/power exactly
+    if (t === 0) setP1(v => ({ ...v, x: tankX, y: tankY, angle, power }));
+    else setP2(v => ({ ...v, x: tankX, y: tankY, angle, power }));
+
+    // Store authoritative data from firing player
+    nextWindRef.current = nextWind;
+    impactRef.current = impact; // { hit, x, y, destroyedIdx }
+
+    // Use the exact projectile physics from the firing player
+    const p = { x: exactProj.x, y: exactProj.y, vx: exactProj.vx, vy: exactProj.vy };
+
+    const fr = t === 0;
+    const rad = ((fr ? -angle : -(180 - angle)) * Math.PI) / 180;
+    setFiringEffect({ tankIdx: t, frame: 0, barrelX: exactProj.x, barrelY: exactProj.y, angle: rad });
+    projRef.current = { ...p };
+    setProj(p); setTrail([]); setChargeProg(0);
+    setPhase("flying");
+    setMsg("💥 INCOMING!");
+    if (sd) sfxFire();
+  }, []);
 
   // ─── CAMERA CENTERING ON TURN START ──────────────────────
   useEffect(() => {
     if (phase === "aiming" && !charging) {
       const tank = turn === 0 ? p1 : p2;
       const targetX = Math.max(0, Math.min(WORLD_W - VIEW_W, tank.x - VIEW_W / 2));
-      // Smooth pan to current player
       setViewportX(targetX);
-      setViewportY(0); // Reset vertical offset
+      setViewportY(0);
+      
+      // Update message for multiplayer
+      if (isMultiplayer) {
+        if (turn === myPlayer) {
+          setMsg("YOUR TURN — HOLD 🔥 TO CHARGE!");
+        } else {
+          setMsg("OPPONENT'S TURN — WAIT...");
+        }
+      }
     }
   }, [phase, turn, charging]);
 
@@ -318,17 +487,16 @@ export default function TitoGame() {
     const ani = () => {
       f++;
       setFiringEffect(prev => prev ? { ...prev, frame: f } : null);
-      if (f < 15) {
-        requestAnimationFrame(ani);
-      } else {
-        setFiringEffect(null);
-      }
+      if (f < 15) requestAnimationFrame(ani);
+      else setFiringEffect(null);
     };
     requestAnimationFrame(ani);
   }, [firingEffect ? `${firingEffect.tankIdx}-fire` : null]);
+
   const startCharge = useCallback(() => {
     if (phase !== "aiming" || chargingRef.current) return;
-    ctx(); // init audio
+    if (isMultiplayer && !isMyTurn) return;
+    ctx();
     setCharging(true); setChargeProg(0);
     chargeStart.current = Date.now();
     let lastTick = 0;
@@ -342,7 +510,7 @@ export default function TitoGame() {
       if (p < 1) chargeRef.current = requestAnimationFrame(tick);
     };
     chargeRef.current = requestAnimationFrame(tick);
-  }, [phase]);
+  }, [phase, isMultiplayer, isMyTurn]);
 
   const releaseCharge = useCallback(() => {
     if (!chargingRef.current) return;
@@ -350,40 +518,56 @@ export default function TitoGame() {
     setCharging(false);
 
     const power = Math.max(10, Math.min(100, Math.floor(((Date.now() - chargeStart.current) / 2000) * 100)));
-    const { turn: t, p1: a, p2: b, snd: sd } = S.current;
+    const { turn: t, p1: a, p2: b, snd: sd, terrain: ter, wind: w } = S.current;
     const tank = t === 0 ? a : b;
     const fr = t === 0;
     const rad = ((fr ? -tank.angle : -(180 - tank.angle)) * Math.PI) / 180;
     const powerMultiplier = getPowerMultiplier();
     const spd = power * powerMultiplier;
-    
-    // Calculate barrel tip position for firing effect
     const barrelX = tank.x + Math.cos(rad) * 24;
     const barrelY = tank.y - 13 + Math.sin(rad) * 24;
-    
     const p = {
-      x: barrelX,
-      y: barrelY,
-      vx: Math.cos(rad) * spd,
-      vy: Math.sin(rad) * spd,
+      x: barrelX, y: barrelY,
+      vx: Math.cos(rad) * spd, vy: Math.sin(rad) * spd,
     };
-    
-    // Trigger firing effect
+
+    // Pre-compute the next wind value deterministically
+    turnCounterRef.current++;
+    const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
+    const nextWind = (createSeededRandom(windSeed)() - 0.5) * 0.08;
+    nextWindRef.current = nextWind;
+
+    // ═══ PRE-SIMULATE: find authoritative impact point ═══
+    const impact = simulateTrajectory(p, w, ter, [a, b]);
+    impactRef.current = impact;
+
     setFiringEffect({ tankIdx: t, frame: 0, barrelX, barrelY, angle: rad });
-    
-    // Update power on current tank
     if (t === 0) setP1(v => ({ ...v, power })); else setP2(v => ({ ...v, power }));
     projRef.current = { ...p };
     setProj(p); setTrail([]); setChargeProg(0);
     setPhase("flying");
-    // Zoom will happen smoothly during flight
     setMsg("💥 INCOMING!");
     if (sd) sfxFire();
-  }, []);
+
+    // Send EXACT projectile state + authoritative impact + next wind to peer
+    if (isMultiplayer) {
+      sendMsg({
+        type: "fire",
+        proj: { x: p.x, y: p.y, vx: p.vx, vy: p.vy },
+        angle: tank.angle,
+        power,
+        tankX: tank.x,
+        tankY: tank.y,
+        nextWind,
+        impact, // authoritative landing point
+      });
+    }
+  }, [isMultiplayer, sendMsg]);
 
   // ─── PROJECTILE FLIGHT ────────────────────────────────────
+  // Animation runs per-frame (visual), but game logic uses authoritative impact.
   useEffect(() => {
-    if (phase !== "flying" || !projRef.current) return;
+    if (phase !== "flying" || !proj) return;
     let pr = { ...projRef.current };
     let pts = [], fc = 0;
 
@@ -391,125 +575,137 @@ export default function TitoGame() {
       const { terrain: ter, p1: a, p2: b, turn: t, wind: w, snd: sd } = S.current;
       pr.vx += w; pr.vy += GRAVITY; pr.x += pr.vx; pr.y += pr.vy; fc++;
       if (fc % 3 === 0) { pts = [...pts, { x: pr.x, y: pr.y }].slice(-30); setTrail([...pts]); }
-      projRef.current = { ...pr };
       setProj({ ...pr });
-      
-      // ═══ DYNAMIC SMOOTH ZOOM ═══
+
+      // ═══ CAMERA ZOOM ═══
       const terrainY = tY(ter, pr.x);
       const heightAboveTerrain = terrainY - pr.y;
       const distanceToGround = Math.max(0, heightAboveTerrain);
-      
-      // Zoom out when high, zoom in when getting close to ground
       let targetZoom;
-      if (fc < 30) {
-        // Early flight: zoom out smoothly (0-30 frames)
-        targetZoom = 1 + (fc / 30); // 1.0 → 2.0
-      } else if (distanceToGround < 150) {
-        // Approaching ground: zoom back in based on distance
-        const zoomProgress = distanceToGround / 150; // 1.0 at 150px, 0.0 at 0px
-        targetZoom = 1 + zoomProgress; // 2.0 → 1.0
-      } else {
-        // Mid-flight: stay zoomed out
-        targetZoom = 2;
-      }
-      
+      if (fc < 30) targetZoom = 1 + (fc / 30);
+      else if (distanceToGround < 150) targetZoom = 1 + (distanceToGround / 150);
+      else targetZoom = 2;
       setCameraZoom(targetZoom);
-      
-      // ═══ CAMERA TRACKING ═══
-      // Smoothly center viewport on projectile with upward offset to see arc
-      const verticalOffset = -80; // Negative = pan up to see trajectory better
       const effectiveViewWidth = VIEW_W * targetZoom;
-      const targetViewX = Math.max(0, Math.min(WORLD_W - effectiveViewWidth, pr.x - effectiveViewWidth / 2));
-      setViewportX(targetViewX);
-      setViewportY(verticalOffset);
+      setViewportX(Math.max(0, Math.min(WORLD_W - effectiveViewWidth, pr.x - effectiveViewWidth / 2)));
+      setViewportY(-80);
 
-      // Out of bounds
-      if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+      // ═══ RESOLVE: use authoritative impact if available ═══
+      const auth = impactRef.current; // pre-simulated impact from firing player
+
+      // Determine if the visual projectile should resolve this frame
+      let shouldResolveOOB = false;
+      let shouldResolveTerrain = false;
+
+      if (auth) {
+        // MULTIPLAYER or LOCAL with pre-sim: use authoritative result
+        if (auth.hit) {
+          // Auth says terrain hit — resolve when visual catches up
+          if (pr.y >= tY(ter, pr.x) || pr.y >= auth.y) {
+            shouldResolveTerrain = true;
+          }
+        } else {
+          // Auth says OOB
+          if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) {
+            shouldResolveOOB = true;
+          }
+        }
+      } else {
+        // No auth data (shouldn't happen but safety fallback)
+        if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y > H + 50) shouldResolveOOB = true;
+        else if (pr.y >= tY(ter, pr.x)) shouldResolveTerrain = true;
+      }
+
+      // ═══ HANDLE MISS (OOB) ═══
+      if (shouldResolveOOB) {
         setProj(null); setTrail([]);
-        setViewportY(0); // Reset vertical offset
-        setCameraZoom(1); // Zoom back in
+        setViewportY(0); setCameraZoom(1);
+        impactRef.current = null;
         if (sd) [sfxSplash, sfxOuch, sfxGlass][Math.floor(Math.random() * 3)]();
         addFloat(Math.max(40, Math.min(WORLD_W - 40, pr.x)), 100,
           ["MISS!", "WHOOSH!", "OUCHHHH!", "💨", "NOPE!"][Math.floor(Math.random() * 5)], "#f59e0b");
-        
-        // Center camera on next player's tank
         const nextTank = t === 0 ? S.current.p2 : S.current.p1;
         setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, nextTank.x - VIEW_W / 2)));
-        
-        setTurn(1 - t); setWind(newWind()); setPhase("aiming");
-        setMsg(`Missed! P${t === 0 ? "2" : "1"}'s turn`);
+
+        // Apply pre-computed wind
+        if (nextWindRef.current !== null) {
+          setWind(nextWindRef.current);
+          nextWindRef.current = null;
+        } else {
+          turnCounterRef.current++;
+          const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
+          setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
+        }
+
+        setTurn(1 - t); setPhase("aiming");
+        if (isMultiplayer) {
+          setMsg(1 - t === myPlayer ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : "OPPONENT'S TURN — WAIT...");
+        } else {
+          setMsg(`Missed! P${t === 0 ? "2" : "1"}'s turn`);
+        }
         return;
       }
 
-      // Terrain hit
-      const ty = tY(ter, pr.x);
-      if (pr.y >= ty) {
+      // ═══ HANDLE TERRAIN HIT ═══
+      if (shouldResolveTerrain) {
+        // Use AUTHORITATIVE impact coordinates — identical on both sides
+        const impX = auth ? auth.x : pr.x;
+        const impY = auth ? auth.y : tY(ter, pr.x);
+
         setProj(null);
-        setViewportY(0); // Reset vertical offset
-        setCameraZoom(1); // Zoom back in
+        setViewportY(0); setCameraZoom(1);
         setPhase("impact");
-        setBoom({ x: pr.x, y: ty, frame: 0 });
+        setBoom({ x: impX, y: impY, frame: 0 });
         if (sd) sfxExplosion();
 
-        // Crater
-        const newT = crater(ter, pr.x, EXPLOSION_RADIUS);
+        // Crater at authoritative position
+        const newT = crater(ter, impX, EXPLOSION_RADIUS);
         setTerrain(newT);
 
-        // ═══ TREE DESTRUCTION ═══
+        // Tree destruction at authoritative position
         const treesBeforeExplosion = S.current.envObjects || [];
         const treesAfterExplosion = treesBeforeExplosion.filter(obj => {
           if (obj.type !== 'tree') return true;
-          const dist = Math.sqrt((obj.x - pr.x) ** 2 + (obj.y - ty) ** 2);
-          return dist > EXPLOSION_RADIUS * 1.2; // Destroy trees within explosion radius
+          const dist = Math.sqrt((obj.x - impX) ** 2 + (obj.y - impY) ** 2);
+          return dist > EXPLOSION_RADIUS * 1.2;
         });
-        if (treesAfterExplosion.length < treesBeforeExplosion.length) {
-          setEnvObjects(treesAfterExplosion);
+        if (treesAfterExplosion.length < treesBeforeExplosion.length) setEnvObjects(treesAfterExplosion);
+
+        // ═══ DAMAGE CHECK at authoritative position ═══
+        let hitAny = false;
+        let destroyedIdx = auth ? auth.destroyedIdx : null;
+
+        // If no auth data, compute locally (single-player fallback)
+        if (!auth) {
+          const tanks = [a, b];
+          tanks.forEach((tk, i) => {
+            const dist = Math.sqrt((tk.x - impX) ** 2 + (tk.y - impY) ** 2);
+            if (dist < EXPLOSION_RADIUS * 0.6 || dist < EXPLOSION_RADIUS * 1.1) {
+              hitAny = true;
+              destroyedIdx = i;
+            }
+          });
+        } else {
+          hitAny = destroyedIdx !== null;
         }
 
-        // ═══ ONE-HIT DESTRUCTION SYSTEM (SELF OR OPPONENT) ═══
-        let hitAny = false;
-        let destroyedIdx = null;
         const tanks = [a, b];
         const newTanks = tanks.map((tk, i) => {
-          const dist = Math.sqrt((tk.x - pr.x) ** 2 + (tk.y - ty) ** 2);
-          let dmg = 0;
-          
-          // Determine damage based on distance
-          if (dist < EXPLOSION_RADIUS * 0.6) {
-            dmg = DAMAGE;
-          } else if (dist < EXPLOSION_RADIUS * 1.1) {
-            dmg = NEAR_DAMAGE;
-          }
-          
-          if (dmg > 0) {
-            hitAny = true;
-            destroyedIdx = i; // Mark this tank for destruction
-            
-            if (i === t) {
-              // Self-hit
-              addFloat(tk.x, tk.y - 30, `💀 SELF-DESTRUCT!`, "#ef4444");
-            } else {
-              // Opponent hit
-              addFloat(tk.x, tk.y - 30, `💀 DESTROYED!`, "#ef4444");
-            }
-            
+          if (i === destroyedIdx) {
+            if (i === t) addFloat(tk.x, tk.y - 30, `💀 SELF-DESTRUCT!`, "#ef4444");
+            else addFloat(tk.x, tk.y - 30, `💀 DESTROYED!`, "#ef4444");
             if (sd) { sfxHit(); sfxOuch(); }
-            
-            return { 
-              ...tk, 
-              y: newT[Math.floor(tk.x)], 
-              hp: 0 // Any hit sets HP to 0
-            };
+            return { ...tk, y: newT[Math.floor(tk.x)], hp: 0 };
           }
           return { ...tk, y: newT[Math.floor(tk.x)] };
         });
 
         setP1(newTanks[0]); setP2(newTanks[1]);
+        impactRef.current = null;
 
-        // ═══ CHECK DESTRUCTION ═══
         if (destroyedIdx !== null) {
           const deadIdx = destroyedIdx;
-          const winner = 1 - deadIdx; // Other player wins
+          const winner = 1 - deadIdx;
           const deadTank = newTanks[deadIdx];
           const isSelfHit = deadIdx === t;
           setMsg(isSelfHit ? `💀 P${deadIdx + 1} SELF-DESTRUCTED!` : `💀 P${deadIdx + 1} DESTROYED!`);
@@ -517,17 +713,31 @@ export default function TitoGame() {
         } else {
           if (!hitAny) {
             if (sd) [sfxSplash, sfxGlass][Math.floor(Math.random() * 2)]();
-            addFloat(pr.x, ty - 20, "BOOM!", "#f59e0b");
+            addFloat(impX, impY - 20, "BOOM!", "#f59e0b");
           }
-          setMsg(hitAny ? `💥 HIT! P${t === 0 ? "2" : "1"}'s turn` : `BOOM! P${t === 0 ? "2" : "1"}'s turn`);
-          
-          // Center camera on next player's tank after impact
+
+          // Apply pre-computed wind
+          if (nextWindRef.current !== null) {
+            setWind(nextWindRef.current);
+            nextWindRef.current = null;
+          } else {
+            turnCounterRef.current++;
+            const windSeed = currentSeedRef.current + turnCounterRef.current * 7919;
+            setWind((createSeededRandom(windSeed)() - 0.5) * 0.08);
+          }
+
+          if (isMultiplayer) {
+            setMsg(1 - t === myPlayer ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : "OPPONENT'S TURN — WAIT...");
+          } else {
+            setMsg(hitAny ? `💥 HIT! P${t === 0 ? "2" : "1"}'s turn` : `BOOM! P${t === 0 ? "2" : "1"}'s turn`);
+          }
+
           const nextTank = newTanks[1 - t];
           setTimeout(() => {
             setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, nextTank.x - VIEW_W / 2)));
           }, 500);
-          
-          setTurn(1 - t); setWind(newWind());
+
+          setTurn(1 - t);
         }
         return;
       }
@@ -550,16 +760,14 @@ export default function TitoGame() {
       } else {
         setBoom(null); setTrail([]);
         if (!S.current.phase || S.current.phase === "impact") {
-          setTimeout(() => {
-            setPhase(prev => prev === "impact" ? "aiming" : prev);
-          }, 50);
+          setTimeout(() => setPhase(prev => prev === "impact" ? "aiming" : prev), 50);
         }
       }
     };
     requestAnimationFrame(ani);
   }, [boom ? 1 : 0]);
 
-  // ─── KILL → DESTROY ANIMATION (triggered by killData) ─────
+  // ─── KILL → DESTROY ANIMATION ─────────────────────────────
   useEffect(() => {
     if (!killData || killData.frame > 0) return;
     setPhase("destroying");
@@ -601,13 +809,18 @@ export default function TitoGame() {
       if (f < 120) {
         requestAnimationFrame(ani);
       } else {
-        setLevel(l => l + 1);
-        setupLevel();
         if (S.current.snd) sfxNextLevel();
+        if (!isMultiplayer || isHost) {
+          // Host or single-player: generate new level + send terrain to guest
+          const newSeed = generateSeed();
+          setLevel(l => l + 1);
+          setupAndSyncLevel(newSeed);
+        }
+        // Multiplayer GUEST: do nothing, wait for "levelState" from host
       }
     };
     requestAnimationFrame(ani);
-  }, [phase === "transition" ? 1 : 0, setupLevel]);
+  }, [phase === "transition" ? 1 : 0, setupAndSyncLevel]);
 
   // ─── BARREL & CAMERA DRAG ─────────────────────────────────
   const handleSvgDown = useCallback((e) => {
@@ -616,32 +829,31 @@ export default function TitoGame() {
     const mx = (e.clientX - rect.left) * (VIEW_W / rect.width) + viewportX;
     const my = (e.clientY - rect.top) * (H / rect.height);
     const tk = S.current.turn === 0 ? S.current.p1 : S.current.p2;
-    
-    // Check if clicking on tank for barrel drag
+
     if (Math.sqrt((mx - tk.x) ** 2 + (my - tk.y) ** 2) < 65) {
-      setDragging(true); 
-      dragSY.current = e.clientY; 
-      dragSA.current = tk.angle; 
+      if (isMultiplayer && !isMyTurn) return; // Can't drag opponent's barrel
+      setDragging(true);
+      dragSY.current = e.clientY;
+      dragSA.current = tk.angle;
       e.preventDefault();
     } else {
-      // Otherwise, start camera drag
       setCameraDragging(true);
       cameraDragStartX.current = e.clientX;
       cameraStartViewportX.current = viewportX;
       e.preventDefault();
     }
-  }, [phase, viewportX]);
+  }, [phase, viewportX, isMultiplayer, isMyTurn]);
 
   useEffect(() => {
     const onMove = (e) => {
       if (dragging) {
-        // Barrel drag
         const dy = dragSY.current - e.clientY;
         const newA = Math.round(Math.max(5, Math.min(90, dragSA.current + dy * 0.5)));
         const { turn: t } = S.current;
-        if (t === 0) setP1(v => ({ ...v, angle: newA })); else setP2(v => ({ ...v, angle: newA }));
+        if (t === 0) setP1(v => ({ ...v, angle: newA }));
+        else setP2(v => ({ ...v, angle: newA }));
+        if (isMultiplayer) sendMsg({ type: "angle", player: t, angle: newA });
       } else if (cameraDragging) {
-        // Camera drag
         const dx = cameraDragStartX.current - e.clientX;
         const rect = svgRef.current?.getBoundingClientRect();
         if (rect) {
@@ -651,72 +863,64 @@ export default function TitoGame() {
         }
       }
     };
-    const onUp = () => { 
-      setDragging(false); 
-      setCameraDragging(false);
-    };
+    const onUp = () => { setDragging(false); setCameraDragging(false); };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
-  }, [dragging, cameraDragging]);
+  }, [dragging, cameraDragging, isMultiplayer, sendMsg]);
 
   const nudgeAngle = (d) => {
     if (phase !== "aiming") return;
+    if (isMultiplayer && !isMyTurn) return;
     const { turn: t } = S.current;
-    if (t === 0) setP1(v => ({ ...v, angle: Math.max(5, Math.min(90, v.angle + d)) }));
-    else setP2(v => ({ ...v, angle: Math.max(5, Math.min(90, v.angle + d)) }));
+    if (t === 0) setP1(v => {
+      const newA = Math.max(5, Math.min(90, v.angle + d));
+      if (isMultiplayer) sendMsg({ type: "angle", player: 0, angle: newA });
+      return { ...v, angle: newA };
+    });
+    else setP2(v => {
+      const newA = Math.max(5, Math.min(90, v.angle + d));
+      if (isMultiplayer) sendMsg({ type: "angle", player: 1, angle: newA });
+      return { ...v, angle: newA };
+    });
   };
 
   const moveTank = (direction) => {
     if (phase !== "aiming") return;
+    if (isMultiplayer && !isMyTurn) return;
     const { turn: t, terrain: ter } = S.current;
-    const moveDistance = 2; // Move 2px at a time
-    
+    const moveDistance = 2;
     if (t === 0) {
       setP1(v => {
         const newX = Math.max(p1Plain.minX, Math.min(p1Plain.maxX, v.x + direction * moveDistance));
+        if (isMultiplayer) sendMsg({ type: "move", player: 0, x: newX });
         return { ...v, x: newX, y: ter[Math.floor(newX)] };
       });
     } else {
       setP2(v => {
         const newX = Math.max(p2Plain.minX, Math.min(p2Plain.maxX, v.x + direction * moveDistance));
+        if (isMultiplayer) sendMsg({ type: "move", player: 1, x: newX });
         return { ...v, x: newX, y: ter[Math.floor(newX)] };
       });
     }
   };
 
-  // ─── CONTINUOUS TANK MOVEMENT ─────────────────────────────
   useEffect(() => {
     if (tankMoving === 0) return;
-    
-    const interval = setInterval(() => {
-      moveTank(tankMoving);
-    }, 50); // Move every 50ms while held
-    
+    const interval = setInterval(() => moveTank(tankMoving), 50);
     return () => clearInterval(interval);
   }, [tankMoving, phase, p1Plain, p2Plain]);
 
-  // Stop tank movement when phase changes
   useEffect(() => {
-    if (phase !== "aiming") {
-      setTankMoving(0);
-    }
+    if (phase !== "aiming") setTankMoving(0);
   }, [phase]);
 
   // ─── KEYBOARD CONTROLS ────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
       if (phase !== "aiming") return;
-      
-      // Arrow keys for camera pan
-      if (e.key === "ArrowLeft") {
-        setViewportX(v => Math.max(0, v - 50));
-        e.preventDefault();
-      } else if (e.key === "ArrowRight") {
-        setViewportX(v => Math.min(WORLD_W - VIEW_W, v + 50));
-        e.preventDefault();
-      }
-      // Home/End to jump to tanks
+      if (e.key === "ArrowLeft") { setViewportX(v => Math.max(0, v - 50)); e.preventDefault(); }
+      else if (e.key === "ArrowRight") { setViewportX(v => Math.min(WORLD_W - VIEW_W, v + 50)); e.preventDefault(); }
       else if (e.key === "Home") {
         const tank = turn === 0 ? p1 : p2;
         setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tank.x - VIEW_W / 2)));
@@ -736,13 +940,34 @@ export default function TitoGame() {
   const aC = turn === 0 ? P1 : P2;
   const chgColor = chargeProg < 0.33 ? "#ef4444" : chargeProg < 0.66 ? "#f59e0b" : "#22c55e";
   const chgPow = Math.max(10, Math.min(100, Math.floor(chargeProg * 100)));
-  const canAct = phase === "aiming" && matchWinner === null;
-
-  // Destroy FX colors
+  const canAct = phase === "aiming" && matchWinner === null && (!isMultiplayer || isMyTurn);
   const dColors = killData ? (killData.deadIdx === 0 ? [P1.main, P1.accent] : [P2.main, P2.accent]) : ["#fff", "#fff"];
+
+  // Player labels for multiplayer
+  const p1Name = isMultiplayer ? (myPlayer === 0 ? "YOU" : "OPP") : "P1";
+  const p2Name = isMultiplayer ? (myPlayer === 1 ? "YOU" : "OPP") : "P2";
 
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
+      
+      {/* MULTIPLAYER CONNECTION STATUS BAR */}
+      {isMultiplayer && (
+        <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 16px", boxSizing: "border-box", background: connected ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", borderBottom: `1px solid ${connected ? "#166534" : "#991b1b"}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: connected ? "#22c55e" : "#ef4444" }} />
+            <span style={{ fontSize: 10, color: connected ? "#22c55e" : "#ef4444" }}>
+              {connected ? "CONNECTED" : "DISCONNECTED"}
+            </span>
+          </div>
+          <span style={{ fontSize: 10, color: "#64748b" }}>
+            YOU ARE {myPlayer === 0 ? "P1 🔵" : "P2 🔴"}
+          </span>
+          <button onClick={onDisconnect} style={{ fontSize: 9, color: "#64748b", background: "none", border: "1px solid #334155", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontFamily: "monospace" }}>
+            EXIT
+          </button>
+        </div>
+      )}
+
       {/* HEADER */}
       <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -753,11 +978,11 @@ export default function TitoGame() {
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "4px 10px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 16 }}>{snd ? "🔊" : "🔇"}</button>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: P1.main }}>P1</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: P1.main }}>{p1Name}</span>
             <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < scores[0] ? P1.accent : "#1e293b", border: `1px solid ${i < scores[0] ? P1.main : "#334155"}` }} />)}</div>
             <span style={{ color: "#334155" }}>|</span>
             <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: WIN_SCORE }, (_, i) => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < scores[1] ? P2.accent : "#1e293b", border: `1px solid ${i < scores[1] ? P2.main : "#334155"}` }} />)}</div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: P2.main }}>P2</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: P2.main }}>{p2Name}</span>
           </div>
         </div>
       </div>
@@ -773,49 +998,37 @@ export default function TitoGame() {
             <filter id="glow"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
 
-          {/* Stars - spread across world */}
           {[...Array(120)].map((_, i) => <circle key={i} cx={(i * 137.5) % WORLD_W} cy={(i * 73.3) % (H * 0.4)} r={i % 5 === 0 ? 1.5 : 0.8} fill="#fff" opacity={0.2 + (i % 5) * 0.08} />)}
           {clouds.map((c, i) => <g key={i} transform={`translate(${c.x},${c.y}) scale(${c.s})`} opacity="0.07"><ellipse cx="0" cy="0" rx="40" ry="15" fill="#fff" /><ellipse cx="-20" cy="5" rx="25" ry="12" fill="#fff" /><ellipse cx="20" cy="3" rx="30" ry="13" fill="#fff" /></g>)}
 
-          {/* Wind - fixed in viewport center */}
           <g transform={`translate(${viewportX + VIEW_W / 2},${viewportY + 25})`}>
             <text x="0" y="-8" textAnchor="middle" fill="#64748b" fontSize="9" fontFamily="monospace">WIND</text>
             <line x1={-30} y1="0" x2={30} y2="0" stroke="#334155" strokeWidth="1" /><line x1={0} y1="-3" x2={0} y2="3" stroke="#475569" strokeWidth="1" />
             <polygon points={wind > 0 ? `${wind * 600},0 ${wind * 600 - 6},-4 ${wind * 600 - 6},4` : `${wind * 600},0 ${wind * 600 + 6},-4 ${wind * 600 + 6},4`} fill={Math.abs(wind) > 0.04 ? "#f59e0b" : "#22d3ee"} />
           </g>
 
-          {/* Terrain */}
           <path d={tPath(terrain)} fill="url(#tG)" />
           <path d={tPath(terrain)} fill="none" stroke="#10b981" strokeWidth="2" opacity="0.3" />
 
-          {/* Environment Objects (Trees) */}
           {envObjects.map((obj, i) => {
             if (obj.type === 'tree') {
-              // Tree rendering
               const baseY = obj.y;
               const trunkWidth = obj.size * 0.15;
               const trunkHeight = obj.size * 0.4;
               const canopySize = obj.size * 0.6;
-              
               if (obj.treeType === 'pine') {
-                // Pine tree (triangle layers)
                 return (
                   <g key={`env-${i}`} opacity="0.7">
-                    {/* Trunk */}
                     <rect x={obj.x - trunkWidth / 2} y={baseY - trunkHeight} width={trunkWidth} height={trunkHeight} fill="#654321" />
-                    {/* Pine layers */}
                     <polygon points={`${obj.x},${baseY - obj.size} ${obj.x - canopySize * 0.7},${baseY - obj.size * 0.6} ${obj.x + canopySize * 0.7},${baseY - obj.size * 0.6}`} fill={`hsl(${obj.hue}, 50%, 35%)`} />
                     <polygon points={`${obj.x},${baseY - obj.size * 0.75} ${obj.x - canopySize * 0.8},${baseY - obj.size * 0.4} ${obj.x + canopySize * 0.8},${baseY - obj.size * 0.4}`} fill={`hsl(${obj.hue}, 45%, 30%)`} />
                     <polygon points={`${obj.x},${baseY - obj.size * 0.5} ${obj.x - canopySize},${baseY - trunkHeight} ${obj.x + canopySize},${baseY - trunkHeight}`} fill={`hsl(${obj.hue}, 40%, 25%)`} />
                   </g>
                 );
               } else {
-                // Round tree (circles)
                 return (
                   <g key={`env-${i}`} opacity="0.7">
-                    {/* Trunk */}
                     <rect x={obj.x - trunkWidth / 2} y={baseY - trunkHeight} width={trunkWidth} height={trunkHeight} fill="#654321" />
-                    {/* Canopy (3 circles for fullness) */}
                     <circle cx={obj.x - canopySize * 0.3} cy={baseY - trunkHeight - canopySize * 0.3} r={canopySize * 0.6} fill={`hsl(${obj.hue}, 50%, 30%)`} />
                     <circle cx={obj.x + canopySize * 0.3} cy={baseY - trunkHeight - canopySize * 0.3} r={canopySize * 0.6} fill={`hsl(${obj.hue}, 45%, 28%)`} />
                     <circle cx={obj.x} cy={baseY - trunkHeight - canopySize * 0.5} r={canopySize * 0.7} fill={`hsl(${obj.hue}, 55%, 32%)`} />
@@ -826,7 +1039,6 @@ export default function TitoGame() {
             return null;
           })}
 
-          {/* Drag hint */}
           {canAct && !charging && !cameraDragging && (
             <g>
               <circle cx={tank.x} cy={tank.y - 13} r="30" fill="transparent" stroke={aC.accent} strokeWidth="1" strokeDasharray="4 4" opacity="0.25"><animate attributeName="opacity" values="0.15;0.4;0.15" dur="2s" repeatCount="indefinite" /></circle>
@@ -834,7 +1046,6 @@ export default function TitoGame() {
             </g>
           )}
 
-          {/* Camera drag indicator */}
           {cameraDragging && (
             <g>
               <rect x={viewportX} y={viewportY} width={VIEW_W} height={H} fill="rgba(100,200,255,0.05)" stroke="rgba(100,200,255,0.3)" strokeWidth="2" strokeDasharray="10 5" />
@@ -842,11 +1053,9 @@ export default function TitoGame() {
             </g>
           )}
 
-          {/* Zoom indicator */}
           {cameraZoom > 1.1 && phase === "flying" && (
             <g>
               <text x={viewportX + VIEW_W * cameraZoom / 2} y={viewportY + 30} textAnchor="middle" fill="#fbbf24" fontSize="12" fontWeight="bold" fontFamily="monospace">📹 TRACKING - ZOOM {cameraZoom.toFixed(1)}x</text>
-              {/* Zoom corners - only show when significantly zoomed */}
               {cameraZoom > 1.5 && (
                 <g stroke="#fbbf24" strokeWidth="2" opacity="0.3">
                   <polyline points={`${viewportX + 10},${viewportY + 10} ${viewportX},${viewportY + 10} ${viewportX},${viewportY + 20}`} fill="none" />
@@ -858,29 +1067,23 @@ export default function TitoGame() {
             </g>
           )}
 
-          {/* Trail */}
-          {trail.map((t, i) => <circle key={i} cx={t.x} cy={t.y} r={3 * cameraZoom} fill="#fff" opacity={((i + 1) / trail.length) * 0.5} />)}
+          {trail.map((t, i) => <circle key={i} cx={t.x} cy={t.y} r="2" fill="#fff" opacity={((i + 1) / trail.length) * 0.4} />)}
 
-          {/* TANKS (hide destroyed tanks - check HP) */}
-          {p1.hp > 0 && <TankG t={p1} c={P1} name="P1" active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} />}
-          {p2.hp > 0 && <TankG t={p2} c={P2} name="P2" active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} />}
+          {p1.hp > 0 && <TankG t={p1} c={P1} name={p1Name} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} />}
+          {p2.hp > 0 && <TankG t={p2} c={P2} name={p2Name} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} />}
 
-          {/* MUZZLE FLASH EFFECT */}
           {firingEffect && (() => {
             const p = Math.min(1, firingEffect.frame / 15);
-            const flash = 1 - p; // Fade out
-            const spread = p * 25; // Expand outward
+            const flash = 1 - p;
+            const spread = p * 25;
             const bx = firingEffect.barrelX;
             const by = firingEffect.barrelY;
             const angle = firingEffect.angle;
             return (
               <g>
-                {/* Main flash */}
                 <circle cx={bx} cy={by} r={8 + spread} fill="#ffcc00" opacity={flash * 0.9} />
                 <circle cx={bx} cy={by} r={5 + spread * 0.7} fill="#ff9500" opacity={flash} />
                 <circle cx={bx} cy={by} r={3 + spread * 0.5} fill="#fff" opacity={flash * 1.2} />
-                
-                {/* Flash rays */}
                 {[...Array(8)].map((_, i) => {
                   const rayAngle = angle + (i * Math.PI / 4) - Math.PI / 2;
                   const len = (8 + spread) * (0.8 + Math.random() * 0.4);
@@ -888,8 +1091,6 @@ export default function TitoGame() {
                   const y2 = by + Math.sin(rayAngle) * len;
                   return <line key={i} x1={bx} y1={by} x2={x2} y2={y2} stroke="#ffcc00" strokeWidth={2 - p * 2} opacity={flash * 0.6} />;
                 })}
-                
-                {/* Smoke puffs */}
                 {firingEffect.frame > 5 && [...Array(4)].map((_, i) => {
                   const puffAngle = angle + (Math.random() - 0.5) * 0.3;
                   const puffDist = (firingEffect.frame - 5) * 2 + i * 3;
@@ -903,16 +1104,12 @@ export default function TitoGame() {
             );
           })()}
 
-          {/* Projectile */}
-          {proj && <g filter="url(#glow)"><circle cx={proj.x} cy={proj.y} r={7 * cameraZoom} fill={aC.accent} /><circle cx={proj.x} cy={proj.y} r={4 * cameraZoom} fill="#fff" opacity="0.9" /><circle cx={proj.x} cy={proj.y} r={12 * cameraZoom} fill={aC.accent} opacity="0.35"><animate attributeName="r" values={`${8*cameraZoom};${16*cameraZoom};${8*cameraZoom}`} dur="0.3s" repeatCount="indefinite" /></circle><circle cx={proj.x} cy={proj.y} r={18 * cameraZoom} fill={aC.accent} opacity="0.12" /></g>}
+          {proj && <g><circle cx={proj.x} cy={proj.y} r="5" fill={aC.accent} /><circle cx={proj.x} cy={proj.y} r="3" fill="#fff" opacity="0.8" /><circle cx={proj.x} cy={proj.y} r="8" fill={aC.accent} opacity="0.3"><animate attributeName="r" values="6;12;6" dur="0.3s" repeatCount="indefinite" /></circle></g>}
 
-          {/* Boom */}
           {boom && (() => { const p = boom.frame / 30, r = EXPLOSION_RADIUS * (0.3 + p * 0.7), op = 1 - p; return (<g><circle cx={boom.x} cy={boom.y} r={r * 1.2} fill="#ff6b00" opacity={op * 0.3} /><circle cx={boom.x} cy={boom.y} r={r} fill="#ff9500" opacity={op * 0.5} /><circle cx={boom.x} cy={boom.y} r={r * 0.6} fill="#ffcc00" opacity={op * 0.7} /><circle cx={boom.x} cy={boom.y} r={r * 0.3} fill="#fff" opacity={op * 0.9} />{[...Array(8)].map((_, i) => { const a = (i * Math.PI * 2) / 8; return <circle key={i} cx={boom.x + Math.cos(a) * r * 1.1 * p} cy={boom.y + Math.sin(a) * r * 1.1 * p} r={3 * (1 - p)} fill="#ffcc00" opacity={op} />; })}</g>); })()}
 
-          {/* Floating texts */}
           {floats.map(f => <text key={f.id} x={f.x} y={f.y} textAnchor="middle" fill={f.color} fontSize="16" fontWeight="900" fontFamily="monospace"><animate attributeName="y" from={f.y} to={f.y - 50} dur="1.2s" fill="freeze" /><animate attributeName="opacity" from="1" to="0" dur="1.2s" fill="freeze" />{f.text}</text>)}
 
-          {/* ═══ TANK DESTROY FX (ON TOP) ═══ */}
           {phase === "destroying" && killData && (() => {
             const p = Math.min(1, killData.frame / DESTROY_FRAMES);
             const kx = killData.x, ky = killData.y;
@@ -941,7 +1138,6 @@ export default function TitoGame() {
             );
           })()}
 
-          {/* LEVEL TRANSITION */}
           {phase === "transition" && transData && (() => {
             const p = Math.min(1, transData.frame / 90);
             const wc = transData.winner === 0 ? "#22d3ee" : "#fb7185";
@@ -949,7 +1145,7 @@ export default function TitoGame() {
               <g>
                 <rect x={viewportX} y="0" width={VIEW_W} height={H} fill="#0a0a1a" opacity={p < 0.5 ? p * 2 * 0.85 : (1 - (p - 0.5) * 2) * 0.85} />
                 {p > 0.15 && p < 0.85 && (<>
-                  <text x={viewportX + VIEW_W / 2} y={H / 2 - 30} textAnchor="middle" fill={wc} fontSize="20" fontWeight="900" fontFamily="monospace" opacity={Math.min(1, (p - 0.15) * 5)}>+1 POINT TO PLAYER {transData.winner + 1}!</text>
+                  <text x={viewportX + VIEW_W / 2} y={H / 2 - 30} textAnchor="middle" fill={wc} fontSize="20" fontWeight="900" fontFamily="monospace" opacity={Math.min(1, (p - 0.15) * 5)}>+1 POINT TO {isMultiplayer ? (transData.winner === myPlayer ? "YOU!" : "OPPONENT!") : `PLAYER ${transData.winner + 1}!`}</text>
                   <text x={viewportX + VIEW_W / 2} y={H / 2 + 20} textAnchor="middle" fill="#94a3b8" fontSize="28" fontWeight="900" fontFamily="monospace" opacity={Math.min(1, (p - 0.25) * 5)}>⚔️ LEVEL {transData.level}</text>
                   <text x={viewportX + VIEW_W / 2} y={H / 2 + 55} textAnchor="middle" fill="#475569" fontSize="12" fontFamily="monospace" opacity={Math.min(1, (p - 0.35) * 5)}>New battlefield incoming...</text>
                 </>)}
@@ -957,39 +1153,31 @@ export default function TitoGame() {
             );
           })()}
 
-          {/* MATCH CELEBRATION */}
-          {phase === "celebration" && matchWinner !== null && <CelebrationG winner={matchWinner} scores={scores} onNew={startNewMatch} viewportX={viewportX} />}
+          {phase === "celebration" && matchWinner !== null && <CelebrationG winner={matchWinner} scores={scores} onNew={startNewMatch} viewportX={viewportX} isMultiplayer={isMultiplayer} myPlayer={myPlayer} />}
         </svg>
       </div>
 
       {/* CONTROLS */}
       <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", boxSizing: "border-box", gap: 10, flexWrap: "wrap" }}>
-        {/* Camera controls */}
         {canAct && (
           <div style={{ display: "flex", gap: 4 }}>
-            <button 
-              onClick={() => {
-                const tank = turn === 0 ? p1 : p2;
-                setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tank.x - VIEW_W / 2)));
-              }}
-              style={{ ...btn, fontSize: 10, padding: "4px 8px" }}
-              title="View your tank"
-            >👁️ ME</button>
-            <button 
-              onClick={() => {
-                const oppTank = turn === 0 ? p2 : p1;
-                setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2)));
-              }}
-              style={{ ...btn, fontSize: 10, padding: "4px 8px" }}
-              title="View opponent"
-            >🎯 OPP</button>
+            <button onClick={() => { const tk = turn === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }} title="View your tank">👁️ ME</button>
+            <button onClick={() => { const oppTank = turn === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }} title="View opponent">🎯 OPP</button>
           </div>
         )}
-        
+
+        {/* Show waiting indicator when not your turn in multiplayer */}
+        {isMultiplayer && !isMyTurn && phase === "aiming" && matchWinner === null && (
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <button onClick={() => { const tk = myPlayer === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>👁️ ME</button>
+            <button onClick={() => { const oppTank = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>🎯 OPP</button>
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
           <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button 
+            <button
               onPointerDown={() => canAct && setTankMoving(-1)}
               onPointerUp={() => setTankMoving(0)}
               onPointerLeave={() => setTankMoving(0)}
@@ -997,7 +1185,7 @@ export default function TitoGame() {
               style={{...btn, opacity: canAct ? 1 : 0.3, userSelect: "none"}}
             >⬅</button>
             <div style={{ width: 50, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
-            <button 
+            <button
               onPointerDown={() => canAct && setTankMoving(1)}
               onPointerUp={() => setTankMoving(0)}
               onPointerLeave={() => setTankMoving(0)}
@@ -1006,13 +1194,13 @@ export default function TitoGame() {
             >➡</button>
           </div>
         </div>
-        
+
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
           <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button onClick={() => nudgeAngle(-5)} style={btn}>◀</button>
+            <button onClick={() => nudgeAngle(-5)} disabled={!canAct} style={{...btn, opacity: canAct ? 1 : 0.3}}>◀</button>
             <div style={{ width: 50, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
-            <button onClick={() => nudgeAngle(5)} style={btn}>▶</button>
+            <button onClick={() => nudgeAngle(5)} disabled={!canAct} style={{...btn, opacity: canAct ? 1 : 0.3}}>▶</button>
           </div>
         </div>
 
@@ -1051,15 +1239,15 @@ export default function TitoGame() {
               boxShadow: charging ? `0 0 30px ${chgColor}` : !canAct ? "none" : `0 0 20px ${aC.glow}`,
               transform: charging ? "scale(1.1)" : "scale(1)", transition: "all 0.15s", touchAction: "none", width: 160,
             }}
-          >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
+          >{charging ? `⚡ ${chgPow}%` : isMultiplayer && !isMyTurn ? "⏳ WAITING..." : "🔥 HOLD TO FIRE"}</button>
         )}
       </div>
 
       {/* HP + Score */}
       <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", padding: "2px 16px", boxSizing: "border-box" }}>
-        {[{ t: p1, c: P1, s: scores[0] }, { t: p2, c: P2, s: scores[1] }].map((d, i) => (
+        {[{ t: p1, c: P1, s: scores[0], n: p1Name }, { t: p2, c: P2, s: scores[1], n: p2Name }].map((d, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, flexDirection: i === 1 ? "row-reverse" : "row" }}>
-            <span style={{ fontSize: 11, color: d.c.main, fontWeight: 700 }}>P{i + 1}</span>
+            <span style={{ fontSize: 11, color: d.c.main, fontWeight: 700 }}>{d.n}</span>
             <div style={{ width: 100, height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${d.t.hp}%`, borderRadius: 3, background: `linear-gradient(90deg,${d.c.main},${d.c.accent})`, transition: "width 0.3s" }} /></div>
             <span style={{ fontSize: 10, color: "#64748b" }}>{d.t.hp}</span>
             <span style={{ fontSize: 12, fontWeight: 900, color: d.c.accent }}>{d.s}</span>
@@ -1074,7 +1262,7 @@ export default function TitoGame() {
 
       {/* World Position Indicator */}
       <div style={{ width: "100%", maxWidth: 820, padding: "8px 16px", boxSizing: "border-box" }}>
-        <div 
+        <div
           style={{ position: "relative", width: "100%", height: 16, background: "#1e293b", borderRadius: 4, overflow: "hidden", cursor: "grab", userSelect: "none" }}
           onPointerDown={(e) => {
             if (phase !== "aiming") return;
@@ -1098,24 +1286,21 @@ export default function TitoGame() {
           onPointerUp={() => setMinimapDragging(false)}
           onPointerLeave={() => setMinimapDragging(false)}
         >
-          {/* Distance line between tanks */}
-          <div style={{ 
-            position: "absolute", 
-            left: `${Math.min(p1.x, p2.x) / WORLD_W * 100}%`, 
-            width: `${Math.abs(p2.x - p1.x) / WORLD_W * 100}%`, 
-            top: "50%", 
-            height: 1, 
-            background: "rgba(250,204,21,0.3)",
-            transform: "translateY(-50%)"
-          }} />
-          {/* P1 marker */}
+          <div style={{ position: "absolute", left: `${Math.min(p1.x, p2.x) / WORLD_W * 100}%`, width: `${Math.abs(p2.x - p1.x) / WORLD_W * 100}%`, top: "50%", height: 1, background: "rgba(250,204,21,0.3)", transform: "translateY(-50%)" }} />
           <div style={{ position: "absolute", left: `${(p1.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P1.accent, boxShadow: `0 0 8px ${P1.accent}` }} />
-          {/* P2 marker */}
           <div style={{ position: "absolute", left: `${(p2.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P2.accent, boxShadow: `0 0 8px ${P2.accent}` }} />
-          {/* Viewport indicator */}
           <div style={{ position: "absolute", left: `${(viewportX / WORLD_W) * 100}%`, top: 0, width: `${(VIEW_W / WORLD_W) * 100}%`, height: "100%", background: cameraDragging ? "rgba(100,200,255,0.2)" : "rgba(255,255,255,0.1)", border: cameraDragging ? "1px solid #64c8ff" : "1px solid rgba(255,255,255,0.3)" }} />
         </div>
       </div>
+
+      {/* Disconnected overlay */}
+      {isMultiplayer && !connected && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ fontSize: 24, color: "#ef4444", fontWeight: 900, fontFamily: "monospace", marginBottom: 16 }}>⚠️ DISCONNECTED</div>
+          <div style={{ fontSize: 14, color: "#94a3b8", marginBottom: 24 }}>Your opponent has left the game.</div>
+          <button onClick={onDisconnect} style={{ padding: "14px 28px", borderRadius: 10, border: "2px solid #f43f5e", background: "linear-gradient(135deg,#e11d48,#f43f5e)", color: "#fff", fontSize: 14, fontWeight: 900, fontFamily: "monospace", cursor: "pointer" }}>BACK TO LOBBY</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1124,14 +1309,11 @@ export default function TitoGame() {
 function TankG({ t, c, name, active, fr, recoil = 0 }) {
   const rad = ((fr ? -t.angle : -(180 - t.angle)) * Math.PI) / 180;
   const bx = t.x + Math.cos(rad) * 22, by = t.y - 8 + Math.sin(rad) * 22;
-  
-  // Recoil effect: move tank backwards and shake
   const recoilProgress = Math.max(0, 1 - recoil / 15);
   const recoilDist = recoil > 0 ? Math.sin((1 - recoilProgress) * Math.PI) * 5 : 0;
   const recoilX = -Math.cos(rad) * recoilDist;
   const recoilY = -Math.sin(rad) * recoilDist;
   const shake = recoil > 0 && recoil < 8 ? Math.sin(recoil * 3) * 0.5 : 0;
-  
   return (
     <g transform={`translate(${recoilX},${recoilY + shake})`}>
       {active && (<><circle cx={t.x} cy={t.y - 40} r={18} fill="none" stroke={c.accent} strokeWidth="2" opacity="0.4"><animate attributeName="r" values="16;22;16" dur="1.5s" repeatCount="indefinite" /></circle><text x={t.x} y={t.y - 55} textAnchor="middle" fill={c.accent} fontSize="11" fontWeight="bold" fontFamily="monospace">▼</text></>)}
@@ -1152,19 +1334,22 @@ function TankG({ t, c, name, active, fr, recoil = 0 }) {
 }
 
 // ─── CELEBRATION COMPONENT ──────────────────────────────────
-function CelebrationG({ winner, scores, onNew, viewportX }) {
+function CelebrationG({ winner, scores, onNew, viewportX, isMultiplayer, myPlayer }) {
   const [conf] = useState(() => Array.from({ length: 60 }, (_, i) => ({ x: Math.random() * VIEW_W, dl: Math.random() * 2, sp: 1 + Math.random() * 2, sz: 4 + Math.random() * 8, cl: ["#06b6d4", "#f43f5e", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#fff"][i % 7], wb: Math.random() * 4 - 2, rt: Math.random() * 360 })));
   const [fr, setFr] = useState(0);
   useEffect(() => { let f = 0; const a = () => { f++; setFr(f); if (f < 300) requestAnimationFrame(a); }; requestAnimationFrame(a); }, []);
   const wc = winner === 0 ? "#22d3ee" : "#fb7185";
   const wa = winner === 0 ? "#06b6d4" : "#f43f5e";
   const centerX = viewportX + VIEW_W / 2;
+  const winnerText = isMultiplayer
+    ? (winner === myPlayer ? "YOU WIN!" : "OPPONENT WINS!")
+    : `PLAYER ${winner + 1} CHAMPION!`;
   return (
     <g>
       <rect x={viewportX} y="0" width={VIEW_W} height={H} fill="#000" opacity="0.75" />
       {conf.map((c, i) => { const t = Math.max(0, (fr / 60) - c.dl); const cy = -20 + t * c.sp * 60; const cx = viewportX + c.x + Math.sin(t * 2 + i) * 30 * c.wb; if (cy > H + 20) return null; return <g key={i} transform={`translate(${cx},${cy}) rotate(${c.rt + fr * (i % 2 === 0 ? 3 : -3)})`}><rect x={-c.sz / 2} y={-c.sz / 4} width={c.sz} height={c.sz / 2} rx="1" fill={c.cl} opacity={0.9} /></g>; })}
       <text x={centerX} y={140} textAnchor="middle" fontSize="60" opacity={Math.min(1, fr / 30)}>🏆</text>
-      <text x={centerX} y={200} textAnchor="middle" fill={wc} fontSize="30" fontWeight="900" fontFamily="monospace" opacity={Math.min(1, Math.max(0, (fr - 15) / 20))}>PLAYER {winner + 1} CHAMPION!</text>
+      <text x={centerX} y={200} textAnchor="middle" fill={wc} fontSize="30" fontWeight="900" fontFamily="monospace" opacity={Math.min(1, Math.max(0, (fr - 15) / 20))}>{winnerText}</text>
       <text x={centerX} y={240} textAnchor="middle" fill="#94a3b8" fontSize="16" fontFamily="monospace" opacity={Math.min(1, Math.max(0, (fr - 30) / 20))}>Final: {scores[0]} — {scores[1]}</text>
       {[...Array(8)].map((_, i) => { const a = (i * Math.PI * 2) / 8; const p = Math.min(1, Math.max(0, (fr - 20) / 40)); return <text key={i} x={centerX + Math.cos(a) * (60 + p * 80)} y={180 + Math.sin(a) * (60 + p * 80) * 0.6} textAnchor="middle" fontSize="20" opacity={(1 - p) * 0.8}>{["⭐", "🎉", "✨", "🎊", "💥", "🌟", "🎆", "🎇"][i]}</text>; })}
       <g transform={`translate(${centerX},280)`} opacity={Math.min(1, Math.max(0, (fr - 40) / 20))}>

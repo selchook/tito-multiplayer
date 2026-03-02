@@ -152,7 +152,7 @@ function Lobby({ onGameStart }) {
           setError("Connection timed out. Make sure the host is still waiting.");
           setStatus("");
         }
-      }, 15000);
+      }, 60000);
     } catch (err) {
       setError("Failed to connect: " + err.message);
       setStatus("");
