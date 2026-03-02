@@ -21,6 +21,8 @@ function Lobby({ onGameStart }) {
   const [joinCode, setJoinCode] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [p1Name, setP1Name] = useState("");
+  const [p2Name, setP2Name] = useState("");
   const [copied, setCopied] = useState(false);
   const peerRef = useRef(null);
   const connRef = useRef(null);
@@ -65,7 +67,6 @@ function Lobby({ onGameStart }) {
   }, []);
 
   const handleCreate = async () => {
-    setMode("create");
     setStatus("Creating room...");
     setError("");
     try {
@@ -74,29 +75,27 @@ function Lobby({ onGameStart }) {
       setRoomCode(code);
       setStatus("Waiting for opponent...");
 
-      // Store peer ID mapping via the room code
-      // We'll use the peer ID directly in the connection
-      // Guest will connect using: host's peer ID
+      const hostName = p1Name.trim() || "P1";
+      const guestName = p2Name.trim() || "P2";
 
       peer.on("connection", (conn) => {
         connRef.current = conn;
         conn.on("open", () => {
-          // Send init message with game seed
           const seed = Math.floor(Math.random() * 2147483647);
-          conn.send({ type: "init", seed, hostPeerId: peer.id });
+          conn.send({ type: "init", seed, hostPeerId: peer.id, p1Name: hostName, p2Name: guestName });
           onGameStart({
             myPlayer: 0,
             seed,
             conn,
             peer,
             isHost: true,
+            myName: hostName,
+            opponentName: guestName,
           });
         });
         conn.on("error", (err) => setError("Connection error: " + err.message));
       });
 
-      // Store the peer ID as the room code mapping
-      // We encode the peer ID in the shareable link
       window.history.replaceState({}, "", `?host=${peer.id}&code=${code}`);
     } catch (err) {
       setError("Failed to create room: " + err.message);
@@ -137,6 +136,8 @@ function Lobby({ onGameStart }) {
             conn,
             peer,
             isHost: false,
+            myName: data.p2Name || "P2",
+            opponentName: data.p1Name || "P1",
           });
         }
       });
@@ -218,7 +219,7 @@ function Lobby({ onGameStart }) {
       {!mode && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, width: 320 }}>
           <button
-            onClick={handleCreate}
+            onClick={() => setMode("create")}
             style={{
               padding: "18px 24px",
               borderRadius: 12,
@@ -288,6 +289,55 @@ function Lobby({ onGameStart }) {
             width: 360,
           }}
         >
+          {!roomCode && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+              <div style={{ fontSize: 12, color: "#64748b", letterSpacing: 2, textAlign: "center" }}>PLAYER NAMES</div>
+              {[
+                { label: "Player 1 (You)", value: p1Name, set: setP1Name, color: "#06b6d4" },
+                { label: "Player 2 (Opponent)", value: p2Name, set: setP2Name, color: "#f43f5e" },
+              ].map(({ label, value, set, color }) => (
+                <input
+                  key={label}
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  placeholder={label}
+                  maxLength={16}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: 10,
+                    border: `2px solid ${color}44`,
+                    background: "#1e293b",
+                    color: "#e2e8f0",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    fontFamily: "monospace",
+                    outline: "none",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                />
+              ))}
+              <button
+                onClick={handleCreate}
+                style={{
+                  padding: "14px 24px",
+                  borderRadius: 10,
+                  border: "2px solid #06b6d4",
+                  background: "linear-gradient(135deg,#0891b2,#06b6d4)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  fontFamily: "monospace",
+                  letterSpacing: 2,
+                  cursor: "pointer",
+                  marginTop: 4,
+                }}
+              >
+                CREATE ROOM →
+              </button>
+            </div>
+          )}
+
           {roomCode && (
             <>
               <div style={{ fontSize: 12, color: "#64748b", letterSpacing: 2 }}>ROOM CODE</div>
@@ -431,6 +481,8 @@ function Lobby({ onGameStart }) {
             setJoinCode("");
             setStatus("");
             setError("");
+            setP1Name("");
+            setP2Name("");
             window.history.replaceState({}, "", window.location.pathname);
           }}
           style={{
@@ -480,6 +532,8 @@ export default function Home() {
       conn={gameSession.conn}
       peer={gameSession.peer}
       isHost={gameSession.isHost}
+      myName={gameSession.myName}
+      opponentName={gameSession.opponentName}
       onDisconnect={() => {
         gameSession.peer?.destroy();
         setGameSession(null);

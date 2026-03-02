@@ -199,11 +199,11 @@ const DEBRIS = Array.from({ length: 14 }, (_, i) => ({
 }));
 
 // ═══════════════════════════════════════════════════════════
-export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, conn, peer, isHost, onDisconnect, myName: myNameProp }) {
+export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, conn, peer, isHost, onDisconnect, myName: myNameProp, opponentName: opponentNameProp }) {
   // ─── MULTIPLAYER STATE ────────────────────────────────────
   const [connected, setConnected] = useState(true);
   const myName = myNameProp || (myPlayer === 0 ? "P1" : "P2");
-  const [opponentName, setOpponentName] = useState(null);
+  const [opponentName, setOpponentName] = useState(opponentNameProp || null);
   const currentSeedRef = useRef(initialSeed);
   const connRef = useRef(conn);
   connRef.current = conn;
