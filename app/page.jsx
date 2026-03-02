@@ -38,14 +38,6 @@ function Lobby({ onGameStart }) {
     }
   }, []);
 
-  // Auto-join when mode is 'join' and we have a code from URL
-  useEffect(() => {
-    if (mode === "join" && joinCode && !connRef.current) {
-      // Small delay to let UI render
-      const timer = setTimeout(() => handleJoin(), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [mode, joinCode]);
 
   const initPeer = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -76,22 +68,24 @@ function Lobby({ onGameStart }) {
       setStatus("Waiting for opponent...");
 
       const hostName = p1Name.trim() || "P1";
-      const guestName = p2Name.trim() || "P2";
 
       peer.on("connection", (conn) => {
         connRef.current = conn;
-        conn.on("open", () => {
-          const seed = Math.floor(Math.random() * 2147483647);
-          conn.send({ type: "init", seed, hostPeerId: peer.id, p1Name: hostName, p2Name: guestName });
-          onGameStart({
-            myPlayer: 0,
-            seed,
-            conn,
-            peer,
-            isHost: true,
-            myName: hostName,
-            opponentName: guestName,
-          });
+        conn.on("data", (data) => {
+          if (data.type === "guestName") {
+            const guestName = data.name || "P2";
+            const seed = Math.floor(Math.random() * 2147483647);
+            conn.send({ type: "init", seed, p1Name: hostName, p2Name: guestName });
+            onGameStart({
+              myPlayer: 0,
+              seed,
+              conn,
+              peer,
+              isHost: true,
+              myName: hostName,
+              opponentName: guestName,
+            });
+          }
         });
         conn.on("error", (err) => setError("Connection error: " + err.message));
       });
@@ -104,16 +98,13 @@ function Lobby({ onGameStart }) {
   };
 
   const handleJoin = async () => {
-    if (!joinCode && !mode) return;
-    setMode("join");
     setStatus("Connecting...");
     setError("");
     try {
       const peer = await initPeer();
 
-      // Get the host peer ID from URL params
       const params = new URLSearchParams(window.location.search);
-      let hostPeerId = params.get("host");
+      const hostPeerId = params.get("host");
 
       if (!hostPeerId) {
         setError("Invalid room link. Ask the host to share the full link.");
@@ -121,10 +112,12 @@ function Lobby({ onGameStart }) {
         return;
       }
 
+      const myGuestName = p2Name.trim() || "P2";
       const conn = peer.connect(hostPeerId, { reliable: true });
       connRef.current = conn;
 
       conn.on("open", () => {
+        conn.send({ type: "guestName", name: myGuestName });
         setStatus("Connected! Waiting for game init...");
       });
 
@@ -136,7 +129,7 @@ function Lobby({ onGameStart }) {
             conn,
             peer,
             isHost: false,
-            myName: data.p2Name || "P2",
+            myName: myGuestName,
             opponentName: data.p1Name || "P1",
           });
         }
@@ -218,32 +211,25 @@ function Lobby({ onGameStart }) {
 
       {!mode && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, width: 320 }}>
-          {[
-            { label: "Player 1 (You)", value: p1Name, set: setP1Name, color: "#06b6d4" },
-            { label: "Player 2 (Opponent)", value: p2Name, set: setP2Name, color: "#f43f5e" },
-          ].map(({ label, value, set, color }) => (
-            <input
-              key={label}
-              value={value}
-              onChange={(e) => set(e.target.value)}
-              placeholder={label}
-              maxLength={16}
-              style={{
-                padding: "12px 16px",
-                borderRadius: 10,
-                border: `2px solid ${color}44`,
-                background: "#1e293b",
-                color: "#e2e8f0",
-                fontSize: 14,
-                fontWeight: 700,
-                fontFamily: "monospace",
-                outline: "none",
-                width: "100%",
-                boxSizing: "border-box",
-              }}
-            />
-          ))}
-          <div style={{ borderTop: "1px solid #1e293b", margin: "4px 0" }} />
+          <input
+            value={p1Name}
+            onChange={(e) => setP1Name(e.target.value)}
+            placeholder="Your name (Player 1)"
+            maxLength={16}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              border: "2px solid #06b6d444",
+              background: "#1e293b",
+              color: "#e2e8f0",
+              fontSize: 14,
+              fontWeight: 700,
+              fontFamily: "monospace",
+              outline: "none",
+              width: "100%",
+              boxSizing: "border-box",
+            }}
+          />
           <button
             onClick={() => { setMode("create"); handleCreate(); }}
             style={{
@@ -285,7 +271,7 @@ function Lobby({ onGameStart }) {
               }}
             />
             <button
-              onClick={handleJoin}
+              onClick={() => setMode("join")}
               disabled={joinCode.length < 3}
               style={{
                 padding: "14px 20px",
@@ -406,26 +392,69 @@ function Lobby({ onGameStart }) {
             gap: 16,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              color: "#06b6d4",
-              fontSize: 14,
-            }}
-          >
+          {!status ? (
+            <>
+              <input
+                value={p2Name}
+                onChange={(e) => setP2Name(e.target.value)}
+                placeholder="Your name (Player 2)"
+                maxLength={16}
+                style={{
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: "2px solid #f43f5e44",
+                  background: "#1e293b",
+                  color: "#e2e8f0",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                  outline: "none",
+                  width: 280,
+                  boxSizing: "border-box",
+                }}
+                autoFocus
+              />
+              <button
+                onClick={handleJoin}
+                style={{
+                  padding: "14px 32px",
+                  borderRadius: 10,
+                  border: "2px solid #f43f5e",
+                  background: "linear-gradient(135deg,#e11d48,#f43f5e)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  fontFamily: "monospace",
+                  letterSpacing: 2,
+                  cursor: "pointer",
+                  width: 280,
+                }}
+              >
+                CONNECT →
+              </button>
+            </>
+          ) : (
             <div
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: "#06b6d4",
-                animation: "pulse 1.5s infinite",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                color: "#06b6d4",
+                fontSize: 14,
               }}
-            />
-            {status || "Preparing to join..."}
-          </div>
+            >
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#06b6d4",
+                  animation: "pulse 1.5s infinite",
+                }}
+              />
+              {status}
+            </div>
+          )}
         </div>
       )}
 
