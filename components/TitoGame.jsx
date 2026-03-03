@@ -308,8 +308,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     let t = genTerrain(rng);
     const x1 = Math.floor(200 + rng() * 200);
     const x2 = Math.floor(WORLD_W - 200 - rng() * 200);
-    t = createPlain(t, x1, 50);
-    t = createPlain(t, x2, 50);
+    t = createPlain(t, x1, 80);
+    t = createPlain(t, x2, 80);
     const env = genEnvironment(t, rng);
     const w = (rng() - 0.5) * 0.08;
     return {
@@ -317,8 +317,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       envObjects: env,
       p1: { x: x1, y: t[x1], angle: 60, power: 50, hp: MAX_HP },
       p2: { x: x2, y: t[x2], angle: 60, power: 50, hp: MAX_HP },
-      p1Plain: { minX: x1 - 25, maxX: x1 + 25 },
-      p2Plain: { minX: x2 - 25, maxX: x2 + 25 },
+      p1Plain: { minX: x1 - 40, maxX: x1 + 40 },
+      p2Plain: { minX: x2 - 40, maxX: x2 + 40 },
       wind: w,
       seed,
     };
