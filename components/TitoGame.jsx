@@ -10,7 +10,7 @@ const EXPLOSION_RADIUS = 35;
 const MAX_HP = 100;
 const DAMAGE = 35;
 const NEAR_DAMAGE = 18;
-const WIN_SCORE = 10;
+const WIN_SCORE = 3;
 const DESTROY_FRAMES = 55;
 
 // ─── SOUND ENGINE ───────────────────────────────────────────
@@ -1170,7 +1170,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
           {cameraZoom > 1.1 && phase === "flying" && (
             <g>
-              <text x={viewportX + VIEW_W * cameraZoom / 2} y={viewportY + 30} textAnchor="middle" fill="#fbbf24" fontSize="12" fontWeight="bold" fontFamily="monospace">📹 TRACKING - ZOOM {cameraZoom.toFixed(1)}x</text>
               {cameraZoom > 1.5 && (
                 <g stroke="#fbbf24" strokeWidth="2" opacity="0.3">
                   <polyline points={`${viewportX + 10},${viewportY + 10} ${viewportX},${viewportY + 10} ${viewportX},${viewportY + 20}`} fill="none" />
@@ -1387,16 +1386,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         )}
       </div>
 
-      {/* HP + Score */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", padding: "2px 12px", boxSizing: "border-box", gap: 8 }}>
-        {[{ t: p1, c: P1, s: scores[0], n: p1Name }, { t: p2, c: P2, s: scores[1], n: p2Name }].map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: i === 1 ? "row-reverse" : "row", flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 10, color: d.c.main, fontWeight: 700, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>{d.n}</span>
-            <div style={{ flex: 1, minWidth: 40, maxWidth: 80, height: 5, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${d.t.hp}%`, borderRadius: 3, background: `linear-gradient(90deg,${d.c.main},${d.c.accent})`, transition: "width 0.3s" }} /></div>
-            <span style={{ fontSize: 9, color: "#64748b", flexShrink: 0 }}>{d.t.hp}</span>
-          </div>
-        ))}
-      </div>
 
       <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
         💀 ANY HIT = INSTANT DEATH &nbsp;•&nbsp; 🏆 FIRST TO {WIN_SCORE} WINS!
@@ -1469,8 +1458,6 @@ function TankG({ t, c, name, active, fr, recoil = 0 }) {
       <line x1={t.x} y1={t.y - 13} x2={bx} y2={by} stroke={c.accent} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
       {active && <circle cx={bx} cy={by} r="3" fill={c.accent} opacity="0.6"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="1s" repeatCount="indefinite" /></circle>}
       <text x={t.x} y={t.y + 18} textAnchor="middle" fill="#fff" fontSize="10" fontWeight="bold" fontFamily="monospace" opacity="0.9">{name}</text>
-      <rect x={t.x - 16} y={t.y + 22} width="32" height="4" rx="2" fill="#1a1a2e" />
-      <rect x={t.x - 16} y={t.y + 22} width={(32 * t.hp) / MAX_HP} height="4" rx="2" fill={t.hp > 50 ? c.accent : t.hp > 25 ? "#f59e0b" : "#ef4444"} />
     </g>
   );
 }
