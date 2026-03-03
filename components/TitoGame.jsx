@@ -15,7 +15,7 @@ const DESTROY_FRAMES = 55;
 
 // Level 1 = flat/close (both visible in viewport), Level 5 = full rugged terrain
 const LEVEL_PARAMS = [
-  { ampScale: 0.15, minSep: 260, maxSep: 320 },  // L1: flat, ~290px apart → both in 800px view
+  { ampScale: 0.15, minSep: 370, maxSep: 410 },  // L1: flat, ~390px apart → both in 800px view
   { ampScale: 0.40, minSep: 480, maxSep: 600 },  // L2
   { ampScale: 0.65, minSep: 780, maxSep: 960 },  // L3
   { ampScale: 0.82, minSep: 1100, maxSep: 1350 }, // L4
@@ -371,7 +371,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     applyLevelState(state);
     // Host sends the actual terrain data to guest — no independent generation
     if (isMultiplayer && isHost) {
-      sendMsg({ type: msgType, state });
+      sendMsg({ type: msgType, state, level: lv });
     }
   }, [generateLevelState, applyLevelState, isMultiplayer, isHost, sendMsg]);
 
@@ -436,7 +436,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           break;
         case "levelState":
           // Host sent authoritative terrain + positions — apply directly
-          setLevel(l => l + 1);
+          setLevel(data.level ?? 1);
           applyLevelState(data.state);
           break;
         case "newMatch":
@@ -1290,6 +1290,16 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               </g>
             );
           })()}
+
+          {/* IN-VIEWPORT HUD — level + scores, always anchored to top of viewport */}
+          {phase !== "transition" && phase !== "celebration" && (
+            <g>
+              <rect x={viewportX + 6} y={6} width={VIEW_W - 12} height={28} rx={5} fill="rgba(10,10,26,0.72)" stroke="#1e293b" strokeWidth={1} />
+              <text x={viewportX + 14} y={24} fill={P1.accent} fontSize="12" fontWeight="900" fontFamily="monospace">{scores[0]}  {p1Name.slice(0, 8)}</text>
+              <text x={viewportX + VIEW_W / 2} y={24} textAnchor="middle" fill="#475569" fontSize="10" fontWeight="700" fontFamily="monospace">LVL {level}</text>
+              <text x={viewportX + VIEW_W - 14} y={24} textAnchor="end" fill={P2.accent} fontSize="12" fontWeight="900" fontFamily="monospace">{p2Name.slice(0, 8)}  {scores[1]}</text>
+            </g>
+          )}
 
           {phase === "transition" && transData && (() => {
             const p = Math.min(1, transData.frame / 90);
