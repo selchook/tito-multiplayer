@@ -1091,7 +1091,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               width: `${windPct * 50}%`,
               background: windColor,
               boxShadow: `0 0 6px ${windColor}88`,
-              ...(wind > 0 ? { left: "50%" } : { right: "50%" }),
+              ...(isTailwind ? { left: "50%" } : { right: "50%" }),
             }} />
           )}
         </div>
