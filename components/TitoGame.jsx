@@ -282,7 +282,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const turnCounterRef = useRef(0); // Deterministic turn counter for wind seeds
   const impactRef = useRef(null); // Authoritative impact point (multiplayer sync)
   const S = useRef({});
-  S.current = { terrain, p1, p2, turn, scores, level, wind, snd, phase, cameraZoom, envObjects };
+  S.current = { terrain, p1, p2, turn, scores, level, wind, snd, phase, cameraZoom, envObjects, cameraIntro };
   chargingRef.current = charging;
 
   const [clouds] = useState(() => {
@@ -522,7 +522,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       rAFId = requestAnimationFrame(step);
     };
 
-    // Phase 1: hold on active player for 2s
+    // Phase 1: hold on active player for 1s
     timers.push(setTimeout(() => {
       // Phase 2: pan to opponent in 1.3s
       pan(myX, oppX, 1300, () => {
@@ -534,7 +534,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           pan(oppX, myX, 1300, () => setCameraIntro(null));
         }, 1500));
       });
-    }, 2000));
+    }, 1000));
 
     return () => {
       timers.forEach(clearTimeout);
@@ -888,7 +888,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // ─── BARREL & CAMERA DRAG ─────────────────────────────────
   const handleSvgDown = useCallback((e) => {
-    if (phase !== "aiming" || chargingRef.current) return;
+    if (phase !== "aiming" || chargingRef.current || S.current.cameraIntro) return;
     const rect = svgRef.current?.getBoundingClientRect(); if (!rect) return;
     const mx = (e.clientX - rect.left) * (VIEW_W / rect.width) + viewportX;
     const my = (e.clientY - rect.top) * (H / rect.height);
@@ -1004,7 +1004,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const aC = turn === 0 ? P1 : P2;
   const chgColor = chargeProg < 0.33 ? "#ef4444" : chargeProg < 0.66 ? "#f59e0b" : "#22c55e";
   const chgPow = Math.max(10, Math.min(100, Math.floor(chargeProg * 100)));
-  const canAct = phase === "aiming" && matchWinner === null && (!isMultiplayer || isMyTurn);
+  const canAct = phase === "aiming" && matchWinner === null && (!isMultiplayer || isMyTurn) && !cameraIntro;
   const dColors = killData ? (killData.deadIdx === 0 ? [P1.main, P1.accent] : [P2.main, P2.accent]) : ["#fff", "#fff"];
 
   // Player labels for multiplayer
@@ -1012,11 +1012,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const p1Name = isMultiplayer ? (myPlayer === 0 ? myName : oppDisplay) : "P1";
   const p2Name = isMultiplayer ? (myPlayer === 1 ? myName : oppDisplay) : "P2";
 
-  // Wind display helpers — color shows which player has the advantage
+  // Wind display helpers
   const windPct = Math.abs(wind) / 0.04;
-  // Wind > 0 blows right → favors P1 (shoots right toward P2); wind < 0 favors P2
-  const windColor = windPct < 0.05 ? "#475569" : wind > 0 ? P1.accent : P2.accent;
-  const windAdvName = windPct < 0.05 ? null : wind > 0 ? p1Name : p2Name;
+  // Tailwind = wind pushes shot toward opponent (P1 shoots right, P2 shoots left)
+  const isTailwind = windPct >= 0.05 && ((turn === 0 && wind > 0) || (turn === 1 && wind < 0));
+  // Color = active player's accent — always flips to "opposite" color when turns change
+  const windColor = windPct < 0.05 ? "#475569" : turn === 0 ? P1.accent : P2.accent;
+  // Label: tailwind = current player's advantage, headwind = opponent's advantage
+  const windAdvName = windPct < 0.05 ? null : isTailwind ? (turn === 0 ? p1Name : p2Name) : (turn === 0 ? p2Name : p1Name);
 
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
@@ -1099,8 +1102,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           {windPct < 0.05 ? "CALM" : `${Math.round(windPct * 100)}%`}
         </span>
         {windAdvName && (
-          <span style={{ fontSize: 9, color: windColor, opacity: 0.8, whiteSpace: "nowrap", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
-            +{windAdvName}
+          <span style={{ fontSize: 9, color: windColor, opacity: 0.85, whiteSpace: "nowrap", maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {isTailwind ? "↑" : "↓"}{windAdvName}
           </span>
         )}
       </div>
