@@ -13,6 +13,15 @@ const NEAR_DAMAGE = 18;
 const WIN_SCORE = 3;
 const DESTROY_FRAMES = 55;
 
+// Level 1 = flat/close (both visible in viewport), Level 5 = full rugged terrain
+const LEVEL_PARAMS = [
+  { ampScale: 0.15, minSep: 260, maxSep: 320 },  // L1: flat, ~290px apart → both in 800px view
+  { ampScale: 0.40, minSep: 480, maxSep: 600 },  // L2
+  { ampScale: 0.65, minSep: 780, maxSep: 960 },  // L3
+  { ampScale: 0.82, minSep: 1100, maxSep: 1350 }, // L4
+  { ampScale: 1.0,  minSep: 1600, maxSep: 1900 }, // L5: full terrain
+];
+
 // ─── SOUND ENGINE ───────────────────────────────────────────
 const AC = typeof window !== "undefined" ? (window.AudioContext || window.webkitAudioContext) : null;
 let actx = null;
@@ -102,10 +111,10 @@ function sfxRoundWin() { const c = ctx(); if (!c) return; [523, 659, 784].forEac
 function sfxNextLevel() { const c = ctx(); if (!c) return; const o = c.createOscillator(); const g = c.createGain(); o.type = "sine"; o.frequency.setValueAtTime(400, c.currentTime); o.frequency.exponentialRampToValueAtTime(800, c.currentTime + 0.3); g.gain.setValueAtTime(0.1, c.currentTime); g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.35); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.35); }
 
 // ─── TERRAIN (SEEDED) ──────────────────────────────────────
-function genTerrain(rng) {
+function genTerrain(rng, ampScale = 1) {
   const r = rng || Math.random;
   const pts = new Array(WORLD_W).fill(0), base = H * 0.45;
-  const a1 = 80 + r() * 60, a2 = 40 + r() * 30, a3 = 15 + r() * 15;
+  const a1 = (80 + r() * 60) * ampScale, a2 = (40 + r() * 30) * ampScale, a3 = (15 + r() * 15) * ampScale;
   const f1 = 0.003 + r() * 0.004, f2 = 0.008 + r() * 0.006, f3 = 0.02 + r() * 0.015;
   const o = r() * 1000;
   for (let x = 0; x < WORLD_W; x++) pts[x] = base + Math.sin((x + o) * f1) * a1 + Math.sin((x + o) * f2) * a2 + Math.sin((x + o) * f3) * a3;
@@ -303,11 +312,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const getPowerMultiplier = useCallback(() => 0.245, []);
 
   // ─── GENERATE LEVEL STATE (pure function, returns data) ───
-  const generateLevelState = useCallback((seed) => {
+  const generateLevelState = useCallback((seed, lv = 1) => {
     const rng = createSeededRandom(seed);
-    let t = genTerrain(rng);
-    const x1 = Math.floor(200 + rng() * 200);
-    const x2 = Math.floor(WORLD_W - 200 - rng() * 200);
+    const lp = LEVEL_PARAMS[Math.min(lv - 1, LEVEL_PARAMS.length - 1)];
+    let t = genTerrain(rng, lp.ampScale);
+    const sep = lp.minSep + Math.floor(rng() * (lp.maxSep - lp.minSep));
+    const x1 = 200 + Math.floor(rng() * (WORLD_W - 400 - sep));
+    const x2 = x1 + sep;
     t = createPlain(t, x1, 80);
     t = createPlain(t, x2, 80);
     const env = genEnvironment(t, rng);
@@ -355,8 +366,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // ─── SETUP + SYNC LEVEL ───────────────────────────────────
   // Host generates and sends full state to guest. Guest never generates terrain.
-  const setupAndSyncLevel = useCallback((seed, msgType = "levelState") => {
-    const state = generateLevelState(seed);
+  const setupAndSyncLevel = useCallback((seed, msgType = "levelState", lv = 1) => {
+    const state = generateLevelState(seed, lv);
     applyLevelState(state);
     // Host sends the actual terrain data to guest — no independent generation
     if (isMultiplayer && isHost) {
@@ -371,17 +382,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     }
     const newSeed = generateSeed();
     setScores([0, 0]); setLevel(1); setMatchWinner(null);
-    setupAndSyncLevel(newSeed, "newMatch");
+    setupAndSyncLevel(newSeed, "newMatch", 1);
   }, [setupAndSyncLevel, isMultiplayer, isHost, sendMsg]);
 
   // Init — host generates terrain, guest waits for host's levelState message
   useEffect(() => {
     if (!isMultiplayer || isHost) {
-      setupAndSyncLevel(initialSeed);
+      setupAndSyncLevel(initialSeed, "levelState", 1);
     }
     // Guest: apply a temporary blank state, will be overwritten by levelState message
     if (isMultiplayer && !isHost) {
-      const fallback = generateLevelState(initialSeed);
+      const fallback = generateLevelState(initialSeed, 1);
       applyLevelState(fallback);
     }
   }, []);
@@ -425,6 +436,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           break;
         case "levelState":
           // Host sent authoritative terrain + positions — apply directly
+          setLevel(l => l + 1);
           applyLevelState(data.state);
           break;
         case "newMatch":
@@ -437,7 +449,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           if (isHost) {
             const newSeed = generateSeed();
             setScores([0, 0]); setLevel(1); setMatchWinner(null);
-            setupAndSyncLevel(newSeed, "newMatch");
+            setupAndSyncLevel(newSeed, "newMatch", 1);
           }
           break;
       }
@@ -877,8 +889,9 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         if (!isMultiplayer || isHost) {
           // Host or single-player: generate new level + send terrain to guest
           const newSeed = generateSeed();
-          setLevel(l => l + 1);
-          setupAndSyncLevel(newSeed);
+          const nextLv = S.current.level + 1;
+          setLevel(nextLv);
+          setupAndSyncLevel(newSeed, "levelState", nextLv);
         }
         // Multiplayer GUEST: do nothing, wait for "levelState" from host
       }
