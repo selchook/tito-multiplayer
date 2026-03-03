@@ -1014,11 +1014,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // Wind display helpers
   const windPct = Math.abs(wind) / 0.04;
-  // Tailwind = wind pushes shot toward opponent (P1 shoots right, P2 shoots left)
   const isTailwind = windPct >= 0.05 && ((turn === 0 && wind > 0) || (turn === 1 && wind < 0));
-  // Color = active player's accent — always flips to "opposite" color when turns change
-  const windColor = windPct < 0.05 ? "#475569" : turn === 0 ? P1.accent : P2.accent;
-  // Label: tailwind = current player's advantage, headwind = opponent's advantage
+  const windColor = windPct < 0.05 ? "#475569" : "#06b6d4";
   const windAdvName = windPct < 0.05 ? null : isTailwind ? (turn === 0 ? p1Name : p2Name) : (turn === 0 ? p2Name : p1Name);
 
   return (
@@ -1091,7 +1088,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               width: `${windPct * 50}%`,
               background: windColor,
               boxShadow: `0 0 6px ${windColor}88`,
-              ...(isTailwind ? { left: "50%" } : { right: "50%" }),
+              ...(wind > 0 ? { left: "50%" } : { right: "50%" }),
             }} />
           )}
         </div>
