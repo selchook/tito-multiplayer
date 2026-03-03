@@ -1291,16 +1291,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             );
           })()}
 
-          {/* IN-VIEWPORT HUD — level + scores, always anchored to top of viewport */}
-          {phase !== "transition" && phase !== "celebration" && (
-            <g>
-              <rect x={viewportX + 6} y={6} width={VIEW_W - 12} height={28} rx={5} fill="rgba(10,10,26,0.72)" stroke="#1e293b" strokeWidth={1} />
-              <text x={viewportX + 14} y={24} fill={P1.accent} fontSize="12" fontWeight="900" fontFamily="monospace">{scores[0]}  {p1Name.slice(0, 8)}</text>
-              <text x={viewportX + VIEW_W / 2} y={24} textAnchor="middle" fill="#475569" fontSize="10" fontWeight="700" fontFamily="monospace">LVL {level}</text>
-              <text x={viewportX + VIEW_W - 14} y={24} textAnchor="end" fill={P2.accent} fontSize="12" fontWeight="900" fontFamily="monospace">{p2Name.slice(0, 8)}  {scores[1]}</text>
-            </g>
-          )}
-
           {phase === "transition" && transData && (() => {
             const p = Math.min(1, transData.frame / 90);
             const wc = transData.winner === 0 ? "#22d3ee" : "#fb7185";
