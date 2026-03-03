@@ -317,7 +317,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     const lp = LEVEL_PARAMS[Math.min(lv - 1, LEVEL_PARAMS.length - 1)];
     let t = genTerrain(rng, lp.ampScale);
     const sep = lp.minSep + Math.floor(rng() * (lp.maxSep - lp.minSep));
-    const x1 = 200 + Math.floor(rng() * (WORLD_W - 400 - sep));
+    // Level 1: anchor both tanks near the left edge so both fit in the 800px viewport at x=0
+    const x1 = lv === 1
+      ? 80 + Math.floor(rng() * (VIEW_W - sep - 160))  // 80 → (720-sep), x2 ≤ 720
+      : 200 + Math.floor(rng() * (WORLD_W - 400 - sep));
     const x2 = x1 + sep;
     t = createPlain(t, x1, 80);
     t = createPlain(t, x2, 80);
@@ -1291,7 +1294,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             );
           })()}
 
-          {phase === "transition" && transData && (() => {
+{phase === "transition" && transData && (() => {
             const p = Math.min(1, transData.frame / 90);
             const wc = transData.winner === 0 ? "#22d3ee" : "#fb7185";
             return (
