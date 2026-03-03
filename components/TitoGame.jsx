@@ -16,8 +16,8 @@ const DESTROY_FRAMES = 55;
 // Level 1 = flat/close (both visible in viewport), Level 5 = full rugged terrain
 const LEVEL_PARAMS = [
   { ampScale: 0.15, minSep: 370, maxSep: 410 },  // L1: flat, ~390px apart → both in 800px view
-  { ampScale: 0.40, minSep: 480, maxSep: 600 },  // L2
-  { ampScale: 0.65, minSep: 780, maxSep: 960 },  // L3
+  { ampScale: 0.40, minSep: 560, maxSep: 620 },  // L2
+  { ampScale: 0.65, minSep: 840, maxSep: 980 },  // L3
   { ampScale: 0.82, minSep: 1100, maxSep: 1350 }, // L4
   { ampScale: 1.0,  minSep: 1600, maxSep: 1900 }, // L5: full terrain
 ];
@@ -1030,9 +1030,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // Wind display helpers
   const windPct = Math.abs(wind) / 0.04;
-  const isTailwind = windPct >= 0.05 && ((turn === 0 && wind > 0) || (turn === 1 && wind < 0));
   const windColor = windPct < 0.05 ? "#475569" : "#06b6d4";
-  const windAdvName = windPct < 0.05 ? null : isTailwind ? (turn === 0 ? p1Name : p2Name) : (turn === 0 ? p2Name : p1Name);
+
 
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
@@ -1114,11 +1113,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         <span style={{ fontSize: 11, fontWeight: 800, color: windColor, minWidth: 38, textAlign: "right", fontFamily: "monospace" }}>
           {windPct < 0.05 ? "CALM" : `${Math.round(windPct * 100)}%`}
         </span>
-        {windAdvName && (
-          <span style={{ fontSize: 9, color: windColor, opacity: 0.85, whiteSpace: "nowrap", maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis" }}>
-            {isTailwind ? "↑" : "↓"}{windAdvName}
-          </span>
-        )}
       </div>
 
       <div style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
