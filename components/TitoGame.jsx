@@ -265,7 +265,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const [tankMoving, setTankMoving] = useState(0);
   const [firingEffect, setFiringEffect] = useState(null);
   const [cameraZoom, setCameraZoom] = useState(1);
-  const [cameraIntro, setCameraIntro] = useState(null); // { from, to }
+  const [cameraIntro, setCameraIntro] = useState(null); // { myX, oppX, oppTankX, oppTankY }
+  const [introArrow, setIntroArrow] = useState(null); // { x, y } | null
 
   const projRef = useRef(null);
   const animRef = useRef(null);
@@ -343,13 +344,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     nextWindRef.current = null;
     impactRef.current = null;
     currentSeedRef.current = state.seed || 0;
-    // Camera intro: start at opponent, pan to active player
+    // Camera intro: hold at active player → pan to opponent → pan back
     const myTank = (!isMultiplayer || myPlayer === 0) ? state.p1 : state.p2;
     const oppTank = (!isMultiplayer || myPlayer === 0) ? state.p2 : state.p1;
-    const toX = Math.max(0, Math.min(WORLD_W - VIEW_W, myTank.x - VIEW_W / 2));
-    const fromX = Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2));
-    setViewportX(fromX);
-    setCameraIntro({ from: fromX, to: toX });
+    const myX = Math.max(0, Math.min(WORLD_W - VIEW_W, myTank.x - VIEW_W / 2));
+    const oppX = Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2));
+    setViewportX(myX);
+    setCameraIntro({ myX, oppX, oppTankX: oppTank.x, oppTankY: oppTank.y });
   }, [isMultiplayer, myPlayer]);
 
   // ─── SETUP + SYNC LEVEL ───────────────────────────────────
@@ -502,23 +503,44 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   }, [phase, turn, charging]);
 
   // ─── CAMERA INTRO PAN ─────────────────────────────────────
+  // Sequence: hold on player 2s → pan to opp 1.3s → show arrow 1.5s → pan back 1.3s
   useEffect(() => {
     if (!cameraIntro) return;
-    const { from, to } = cameraIntro;
-    if (from === to) { setCameraIntro(null); return; }
-    const holdTimer = setTimeout(() => {
-      const duration = 700;
+    const { myX, oppX, oppTankX, oppTankY } = cameraIntro;
+    const timers = [];
+    let rAFId = null;
+    const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    const pan = (fromV, toV, duration, onDone) => {
       const start = Date.now();
-      const ani = () => {
-        const t = Math.min(1, (Date.now() - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        setViewportX(Math.round(from + (to - from) * eased));
-        if (t < 1) requestAnimationFrame(ani);
-        else setCameraIntro(null);
+      const step = () => {
+        const prog = Math.min(1, (Date.now() - start) / duration);
+        setViewportX(Math.round(fromV + (toV - fromV) * easeInOut(prog)));
+        if (prog < 1) { rAFId = requestAnimationFrame(step); }
+        else onDone();
       };
-      requestAnimationFrame(ani);
-    }, 1200);
-    return () => clearTimeout(holdTimer);
+      rAFId = requestAnimationFrame(step);
+    };
+
+    // Phase 1: hold on active player for 2s
+    timers.push(setTimeout(() => {
+      // Phase 2: pan to opponent in 1.3s
+      pan(myX, oppX, 1300, () => {
+        // Phase 3: show arrow for 1.5s
+        setIntroArrow({ x: oppTankX, y: oppTankY });
+        timers.push(setTimeout(() => {
+          setIntroArrow(null);
+          // Phase 4: pan back to player in 1.3s
+          pan(oppX, myX, 1300, () => setCameraIntro(null));
+        }, 1500));
+      });
+    }, 2000));
+
+    return () => {
+      timers.forEach(clearTimeout);
+      if (rAFId) cancelAnimationFrame(rAFId);
+      setIntroArrow(null);
+    };
   }, [cameraIntro]);
 
   // ─── FIRING EFFECT ANIMATION ──────────────────────────────
@@ -990,9 +1012,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const p1Name = isMultiplayer ? (myPlayer === 0 ? myName : oppDisplay) : "P1";
   const p2Name = isMultiplayer ? (myPlayer === 1 ? myName : oppDisplay) : "P2";
 
-  // Wind display helpers
+  // Wind display helpers — color shows which player has the advantage
   const windPct = Math.abs(wind) / 0.04;
-  const windColor = windPct < 0.3 ? "#22d3ee" : windPct < 0.7 ? "#f59e0b" : "#ef4444";
+  // Wind > 0 blows right → favors P1 (shoots right toward P2); wind < 0 favors P2
+  const windColor = windPct < 0.05 ? "#475569" : wind > 0 ? P1.accent : P2.accent;
+  const windAdvName = windPct < 0.05 ? null : wind > 0 ? p1Name : p2Name;
 
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
@@ -1058,7 +1082,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2, whiteSpace: "nowrap" }}>WIND</span>
         <div style={{ flex: 1, position: "relative", height: 10, background: "#0f172a", borderRadius: 5, border: "1px solid #1e293b", overflow: "hidden" }}>
           <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "#334155" }} />
-          {wind !== 0 && (
+          {windPct >= 0.05 && (
             <div style={{
               position: "absolute", top: 2, bottom: 2, borderRadius: 3,
               width: `${windPct * 50}%`,
@@ -1074,6 +1098,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         <span style={{ fontSize: 11, fontWeight: 800, color: windColor, minWidth: 38, textAlign: "right", fontFamily: "monospace" }}>
           {windPct < 0.05 ? "CALM" : `${Math.round(windPct * 100)}%`}
         </span>
+        {windAdvName && (
+          <span style={{ fontSize: 9, color: windColor, opacity: 0.8, whiteSpace: "nowrap", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
+            +{windAdvName}
+          </span>
+        )}
       </div>
 
       <div style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
@@ -1154,6 +1183,35 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
           {p1.hp > 0 && <TankG t={p1} c={P1} name={p1Name} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} />}
           {p2.hp > 0 && <TankG t={p2} c={P2} name={p2Name} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} />}
+
+          {/* INTRO ARROW — red target indicator on opponent tank */}
+          {introArrow && (() => {
+            const ax = introArrow.x, ay = introArrow.y;
+            return (
+              <g>
+                {/* Pulsing ring */}
+                <circle cx={ax} cy={ay - 10} r={28} fill="none" stroke="#ef4444" strokeWidth={2.5} opacity={0.6}>
+                  <animate attributeName="r" values="22;34;22" dur="0.9s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.7;0.2;0.7" dur="0.9s" repeatCount="indefinite" />
+                </circle>
+                {/* Arrow shaft */}
+                <rect x={ax - 4} y={ay - 90} width={8} height={42} rx={3} fill="#ef4444">
+                  <animate attributeName="y" values={`${ay - 90};${ay - 78};${ay - 90}`} dur="0.6s" repeatCount="indefinite" />
+                </rect>
+                {/* Arrow head */}
+                <polygon points={`${ax},${ay - 30} ${ax - 14},${ay - 54} ${ax + 14},${ay - 54}`} fill="#ef4444">
+                  <animate attributeName="points"
+                    values={`${ax},${ay - 30} ${ax - 14},${ay - 54} ${ax + 14},${ay - 54};${ax},${ay - 18} ${ax - 14},${ay - 42} ${ax + 14},${ay - 42};${ax},${ay - 30} ${ax - 14},${ay - 54} ${ax + 14},${ay - 54}`}
+                    dur="0.6s" repeatCount="indefinite" />
+                </polygon>
+                {/* Label */}
+                <text x={ax} y={ay - 96} textAnchor="middle" fill="#ef4444" fontSize="11" fontWeight="900" fontFamily="monospace" letterSpacing="2">
+                  <animate attributeName="y" values={`${ay - 96};${ay - 84};${ay - 96}`} dur="0.6s" repeatCount="indefinite" />
+                  ENEMY
+                </text>
+              </g>
+            );
+          })()}
 
           {firingEffect && (() => {
             const p = Math.min(1, firingEffect.frame / 15);
