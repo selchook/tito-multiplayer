@@ -265,6 +265,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const [tankMoving, setTankMoving] = useState(0);
   const [firingEffect, setFiringEffect] = useState(null);
   const [cameraZoom, setCameraZoom] = useState(1);
+  const [cameraIntro, setCameraIntro] = useState(null); // { from, to }
 
   const projRef = useRef(null);
   const animRef = useRef(null);
@@ -342,7 +343,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     nextWindRef.current = null;
     impactRef.current = null;
     currentSeedRef.current = state.seed || 0;
-    setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, state.p1.x - VIEW_W / 2)));
+    // Camera intro: start at opponent, pan to active player
+    const myTank = (!isMultiplayer || myPlayer === 0) ? state.p1 : state.p2;
+    const oppTank = (!isMultiplayer || myPlayer === 0) ? state.p2 : state.p1;
+    const toX = Math.max(0, Math.min(WORLD_W - VIEW_W, myTank.x - VIEW_W / 2));
+    const fromX = Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2));
+    setViewportX(fromX);
+    setCameraIntro({ from: fromX, to: toX });
   }, [isMultiplayer, myPlayer]);
 
   // ─── SETUP + SYNC LEVEL ───────────────────────────────────
@@ -494,6 +501,26 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     }
   }, [phase, turn, charging]);
 
+  // ─── CAMERA INTRO PAN ─────────────────────────────────────
+  useEffect(() => {
+    if (!cameraIntro) return;
+    const { from, to } = cameraIntro;
+    if (from === to) { setCameraIntro(null); return; }
+    const holdTimer = setTimeout(() => {
+      const duration = 700;
+      const start = Date.now();
+      const ani = () => {
+        const t = Math.min(1, (Date.now() - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setViewportX(Math.round(from + (to - from) * eased));
+        if (t < 1) requestAnimationFrame(ani);
+        else setCameraIntro(null);
+      };
+      requestAnimationFrame(ani);
+    }, 1200);
+    return () => clearTimeout(holdTimer);
+  }, [cameraIntro]);
+
   // ─── FIRING EFFECT ANIMATION ──────────────────────────────
   useEffect(() => {
     if (!firingEffect || firingEffect.frame > 0) return;
@@ -615,8 +642,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       if (auth) {
         // MULTIPLAYER or LOCAL with pre-sim: use authoritative result
         if (auth.hit) {
-          // Auth says terrain hit — resolve when visual catches up
-          if (pr.y >= tY(ter, pr.x) || pr.y >= auth.y) {
+          // Resolve when visual projectile physically hits terrain (min 3 frames so it's always visible)
+          if (fc > 3 && pr.y >= tY(ter, pr.x)) {
             shouldResolveTerrain = true;
           }
         } else {
@@ -963,6 +990,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const p1Name = isMultiplayer ? (myPlayer === 0 ? myName : oppDisplay) : "P1";
   const p2Name = isMultiplayer ? (myPlayer === 1 ? myName : oppDisplay) : "P2";
 
+  // Wind display helpers
+  const windPct = Math.abs(wind) / 0.04;
+  const windColor = windPct < 0.3 ? "#22d3ee" : windPct < 0.7 ? "#f59e0b" : "#ef4444";
+
   return (
     <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
       
@@ -1022,6 +1053,29 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </div>
       </div>
 
+      {/* WIND BAR */}
+      <div style={{ width: "100%", maxWidth: 820, display: "flex", alignItems: "center", gap: 8, padding: "5px 12px", boxSizing: "border-box", background: "rgba(10,10,26,0.95)", borderTop: "1px solid #1e293b" }}>
+        <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2, whiteSpace: "nowrap" }}>WIND</span>
+        <div style={{ flex: 1, position: "relative", height: 10, background: "#0f172a", borderRadius: 5, border: "1px solid #1e293b", overflow: "hidden" }}>
+          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "#334155" }} />
+          {wind !== 0 && (
+            <div style={{
+              position: "absolute", top: 2, bottom: 2, borderRadius: 3,
+              width: `${windPct * 50}%`,
+              background: windColor,
+              boxShadow: `0 0 6px ${windColor}88`,
+              ...(wind > 0 ? { left: "50%" } : { right: "50%" }),
+            }} />
+          )}
+        </div>
+        <span style={{ fontSize: 20, lineHeight: 1, color: windColor, width: 20, textAlign: "center" }}>
+          {windPct < 0.05 ? "·" : wind > 0 ? "▶" : "◀"}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: windColor, minWidth: 38, textAlign: "right", fontFamily: "monospace" }}>
+          {windPct < 0.05 ? "CALM" : `${Math.round(windPct * 100)}%`}
+        </span>
+      </div>
+
       <div style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
 
       {/* SVG CANVAS */}
@@ -1036,13 +1090,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           {[...Array(120)].map((_, i) => <circle key={i} cx={(i * 137.5) % WORLD_W} cy={(i * 73.3) % (H * 0.4)} r={i % 5 === 0 ? 1.5 : 0.8} fill="#fff" opacity={0.2 + (i % 5) * 0.08} />)}
           {clouds.map((c, i) => <g key={i} transform={`translate(${c.x},${c.y}) scale(${c.s})`} opacity="0.07"><ellipse cx="0" cy="0" rx="40" ry="15" fill="#fff" /><ellipse cx="-20" cy="5" rx="25" ry="12" fill="#fff" /><ellipse cx="20" cy="3" rx="30" ry="13" fill="#fff" /></g>)}
 
-          <g transform={`translate(${viewportX + VIEW_W / 2},${viewportY + 25})`}>
-            <text x="0" y="-8" textAnchor="middle" fill="#64748b" fontSize="9" fontFamily="monospace">WIND</text>
-            <line x1={-30} y1="0" x2={30} y2="0" stroke="#334155" strokeWidth="1" /><line x1={0} y1="-3" x2={0} y2="3" stroke="#475569" strokeWidth="1" />
-            <polygon points={wind > 0 ? `${wind * 600},0 ${wind * 600 - 6},-4 ${wind * 600 - 6},4` : `${wind * 600},0 ${wind * 600 + 6},-4 ${wind * 600 + 6},4`} fill={Math.abs(wind) > 0.04 ? "#f59e0b" : "#22d3ee"} />
-          </g>
-
-          <path d={tPath(terrain)} fill="url(#tG)" />
+<path d={tPath(terrain)} fill="url(#tG)" />
           <path d={tPath(terrain)} fill="none" stroke="#10b981" strokeWidth="2" opacity="0.3" />
 
           {envObjects.map((obj, i) => {
