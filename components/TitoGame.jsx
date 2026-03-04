@@ -1316,89 +1316,75 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
       {/* CONTROLS */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "center", alignItems: "center", padding: "8px 10px", boxSizing: "border-box", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", boxSizing: "border-box", gap: 6 }}>
+
+        {/* View buttons — always shown during aiming / flying phases */}
+        {(phase === "aiming" || phase === "flying") && matchWinner === null && (
+          <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{myBtnLabel}: ME</button>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnLabel}: {oppBtnName}</button>
+          </div>
+        )}
+
+        {/* Active controls row — only shown when it's your turn */}
         {canAct && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>ME</button>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
-          </div>
-        )}
-
-        {/* Show waiting indicator when not your turn in multiplayer */}
-        {isMultiplayer && !isMyTurn && phase === "aiming" && matchWinner === null && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button onClick={() => { const tk = myPlayer === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>ME</button>
-            <button onClick={() => { const tk = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-          <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              onPointerDown={() => canAct && setTankMoving(-1)}
-              onPointerUp={() => setTankMoving(0)}
-              onPointerLeave={() => setTankMoving(0)}
-              disabled={!canAct}
-              style={{...btn, opacity: canAct ? 1 : 0.3, userSelect: "none"}}
-            >⬅</button>
-            <div style={{ width: 50, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
-            <button
-              onPointerDown={() => canAct && setTankMoving(1)}
-              onPointerUp={() => setTankMoving(0)}
-              onPointerLeave={() => setTankMoving(0)}
-              disabled={!canAct}
-              style={{...btn, opacity: canAct ? 1 : 0.3, userSelect: "none"}}
-            >➡</button>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-          <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button onClick={() => nudgeAngle(-5)} disabled={!canAct} style={{...btn, opacity: canAct ? 1 : 0.3}}>◀</button>
-            <div style={{ width: 50, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
-            <button onClick={() => nudgeAngle(5)} disabled={!canAct} style={{...btn, opacity: canAct ? 1 : 0.3}}>▶</button>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 150 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
-          </div>
-          <div style={{ position: "relative", width: 150, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
-            <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
-            <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
-          </div>
-          {charging && (
-            <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-              {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onPointerDown={() => setTankMoving(-1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>⬅</button>
+                <div style={{ width: 44, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
+                <button onPointerDown={() => setTankMoving(1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>➡</button>
+              </div>
             </div>
-          )}
-          {!charging && (
-            <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
-          )}
-        </div>
 
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => nudgeAngle(-5)} style={{...btn}}>◀</button>
+                <div style={{ width: 44, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
+                <button onClick={() => nudgeAngle(5)} style={{...btn}}>▶</button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
+              <div style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
+                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
+                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
+              </div>
+              {charging ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
+                </div>
+              ) : (
+                <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Main action area */}
         {matchWinner !== null ? (
           <button onClick={startNewMatch} style={{ padding: "16px 24px", borderRadius: 12, border: "2px solid #a855f7", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2, cursor: "pointer", boxShadow: "0 0 25px rgba(168,85,247,0.4)", minWidth: 160 }}>🏆 NEW MATCH</button>
-        ) : (
+        ) : isMultiplayer && !isMyTurn && phase === "aiming" ? (
+          <div style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
+        ) : canAct ? (
           <button
             onPointerDown={startCharge} onPointerUp={releaseCharge}
             onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
             onContextMenu={e => e.preventDefault()}
-            disabled={!canAct}
             style={{
               padding: "16px 24px", borderRadius: 12, border: "2px solid",
-              borderColor: !canAct ? "#334155" : charging ? chgColor : aC.main,
-              background: !canAct ? "#1e293b" : charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
-              color: !canAct ? "#475569" : "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
-              cursor: !canAct ? "not-allowed" : "pointer",
-              boxShadow: charging ? `0 0 30px ${chgColor}` : !canAct ? "none" : `0 0 20px ${aC.glow}`,
+              borderColor: charging ? chgColor : aC.main,
+              background: charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
+              color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
+              cursor: "pointer",
+              boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
               transform: charging ? "scale(1.1)" : "scale(1)", transition: "all 0.15s", touchAction: "none", width: 160,
             }}
-          >{charging ? `⚡ ${chgPow}%` : isMultiplayer && !isMyTurn ? "⏳ WAITING..." : "🔥 HOLD TO FIRE"}</button>
-        )}
+          >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
+        ) : null}
       </div>
 
 
