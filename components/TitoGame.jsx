@@ -1036,12 +1036,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // Wind display helpers
   const windPct = Math.abs(wind) / 0.04;
-  const windColor = windPct < 0.05 ? "#475569" : "#06b6d4";
+  const windColor = windPct < 0.05 ? "#475569" : "#e2e8f0";
 
-  // View buttons — colors and opponent label
+  // View buttons — colors, opponent label, and left/right order by player side
   const oppBtnLabel = isMultiplayer ? (myPlayer === 0 ? "P2" : "P1") : (turn === 0 ? "P2" : "P1");
   const myBtnColor  = myPlayer === 0 ? P1.accent : P2.accent;
   const oppBtnColor = myPlayer === 0 ? P2.accent : P1.accent;
+  // P1 is always left side, P2 is always right side — buttons follow the same order
+  const myIsLeft = isMultiplayer ? myPlayer === 0 : turn === 0;
   const oppBtnName  = isMultiplayer ? oppDisplay.slice(0, 7) : oppBtnLabel;
 
 
@@ -1332,8 +1334,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
         {/* View buttons — always shown during aiming / flying phases */}
         {(phase === "aiming" || phase === "flying") && matchWinner === null && (
-          <div className="tito-vbtns" style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>ME</button>
+          <div className="tito-vbtns" style={{ display: "flex", gap: 6, justifyContent: "center", flexDirection: myIsLeft ? "row" : "row-reverse" }}>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>YOU</button>
             <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
           </div>
         )}
