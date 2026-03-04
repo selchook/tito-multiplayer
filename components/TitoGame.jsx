@@ -1033,8 +1033,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const windPct = Math.abs(wind) / 0.04;
   const windColor = windPct < 0.05 ? "#475569" : "#06b6d4";
 
-  // View buttons — ME/OPP labels and colors
-  const myBtnLabel  = isMultiplayer ? (myPlayer === 0 ? "P1" : "P2") : (turn === 0 ? "P1" : "P2");
+  // View buttons — colors and opponent label
   const oppBtnLabel = isMultiplayer ? (myPlayer === 0 ? "P2" : "P1") : (turn === 0 ? "P2" : "P1");
   const myBtnColor  = myPlayer === 0 ? P1.accent : P2.accent;
   const oppBtnColor = myPlayer === 0 ? P2.accent : P1.accent;
@@ -1315,20 +1314,28 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </svg>
       </div>
 
+      <style>{`
+        @media (min-width: 600px) {
+          .tito-ctrl { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; justify-content: center !important; gap: 8px !important; }
+          .tito-vbtns { display: contents !important; }
+          .tito-actctrl { display: contents !important; }
+        }
+      `}</style>
+
       {/* CONTROLS */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", boxSizing: "border-box", gap: 6 }}>
+      <div className="tito-ctrl" style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", boxSizing: "border-box", gap: 6 }}>
 
         {/* View buttons — always shown during aiming / flying phases */}
         {(phase === "aiming" || phase === "flying") && matchWinner === null && (
-          <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{myBtnLabel}: ME</button>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnLabel}: {oppBtnName}</button>
+          <div className="tito-vbtns" style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>ME</button>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
           </div>
         )}
 
         {/* Active controls row — only shown when it's your turn */}
         {canAct && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+          <div className="tito-actctrl" style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
               <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
