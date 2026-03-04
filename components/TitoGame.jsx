@@ -337,7 +337,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   }, []);
 
   // ─── APPLY LEVEL STATE (sets all React state from data) ───
-  const applyLevelState = useCallback((state) => {
+  const applyLevelState = useCallback((state, startingTurn = 0) => {
     setTerrain(state.terrain);
     setEnvObjects(state.envObjects);
     setP1(state.p1);
@@ -345,10 +345,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     setP1Plain(state.p1Plain);
     setP2Plain(state.p2Plain);
     setWind(state.wind);
-    setTurn(0);
+    setTurn(startingTurn);
     setPhase("aiming");
     setProj(null); setTrail([]); setBoom(null); setKillData(null); setTransData(null);
-    setMsg(isMultiplayer && myPlayer === 0 ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : isMultiplayer ? "OPPONENT'S TURN — WAIT..." : "PLAYER 1 — HOLD 🔥 TO CHARGE!");
+    setMsg(isMultiplayer ? (startingTurn === myPlayer ? "YOUR TURN — HOLD 🔥 TO CHARGE!" : "OPPONENT'S TURN — WAIT...") : `PLAYER ${startingTurn + 1} — HOLD 🔥 TO CHARGE!`);
     setFloats([]); setCharging(false); setChargeProg(0);
     setCameraZoom(1);
     setViewportY(0);
@@ -367,12 +367,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
   // ─── SETUP + SYNC LEVEL ───────────────────────────────────
   // Host generates and sends full state to guest. Guest never generates terrain.
-  const setupAndSyncLevel = useCallback((seed, msgType = "levelState", lv = 1, scores = null) => {
+  const setupAndSyncLevel = useCallback((seed, msgType = "levelState", lv = 1, scores = null, startingTurn = 0) => {
     const state = generateLevelState(seed, lv);
-    applyLevelState(state);
+    applyLevelState(state, startingTurn);
     // Host sends the actual terrain data to guest — no independent generation
     if (isMultiplayer && isHost) {
-      sendMsg({ type: msgType, state, level: lv, ...(scores && { scores }) });
+      sendMsg({ type: msgType, state, level: lv, startingTurn, ...(scores && { scores }) });
     }
   }, [generateLevelState, applyLevelState, isMultiplayer, isHost, sendMsg]);
 
@@ -439,7 +439,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           // Host sent authoritative terrain + positions — apply directly
           setLevel(data.level ?? 1);
           if (data.scores) setScores(data.scores);
-          applyLevelState(data.state);
+          applyLevelState(data.state, data.startingTurn ?? 0);
           break;
         case "newMatch":
           // Host started new match with full state
@@ -893,8 +893,9 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           const newSeed = generateSeed();
           const nextLv = S.current.level + 1;
           const currentScores = S.current.scores;
+          const winner = transData?.winner ?? 0;
           setLevel(nextLv);
-          setupAndSyncLevel(newSeed, "levelState", nextLv, currentScores);
+          setupAndSyncLevel(newSeed, "levelState", nextLv, currentScores, winner);
         }
         // Multiplayer GUEST: do nothing, wait for "levelState" from host
       }
@@ -1031,6 +1032,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   // Wind display helpers
   const windPct = Math.abs(wind) / 0.04;
   const windColor = windPct < 0.05 ? "#475569" : "#06b6d4";
+
+  // View buttons — ME/OPP labels and colors
+  const myBtnLabel  = isMultiplayer ? (myPlayer === 0 ? "P1" : "P2") : (turn === 0 ? "P1" : "P2");
+  const oppBtnLabel = isMultiplayer ? (myPlayer === 0 ? "P2" : "P1") : (turn === 0 ? "P2" : "P1");
+  const myBtnColor  = myPlayer === 0 ? P1.accent : P2.accent;
+  const oppBtnColor = myPlayer === 0 ? P2.accent : P1.accent;
+  const oppBtnName  = isMultiplayer ? oppDisplay.slice(0, 7) : oppBtnLabel;
 
 
   return (
@@ -1310,17 +1318,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       {/* CONTROLS */}
       <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "center", alignItems: "center", padding: "8px 10px", boxSizing: "border-box", gap: 8, flexWrap: "wrap" }}>
         {canAct && (
-          <div style={{ display: "flex", gap: 4 }}>
-            <button onClick={() => { const tk = turn === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }} title="View your tank">👁️ ME</button>
-            <button onClick={() => { const oppTank = turn === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }} title="View opponent">🎯 OPP</button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{myBtnLabel}: ME</button>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnLabel}: {oppBtnName}</button>
           </div>
         )}
 
         {/* Show waiting indicator when not your turn in multiplayer */}
         {isMultiplayer && !isMyTurn && phase === "aiming" && matchWinner === null && (
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <button onClick={() => { const tk = myPlayer === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>👁️ ME</button>
-            <button onClick={() => { const oppTank = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2))); }} style={{ ...btn, fontSize: 10, padding: "4px 8px" }}>🎯 {oppDisplay.slice(0, 5)}</button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button onClick={() => { const tk = myPlayer === 0 ? p1 : p2; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{myBtnLabel}: ME</button>
+            <button onClick={() => { const tk = myPlayer === 0 ? p2 : p1; setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnLabel}: {oppBtnName}</button>
           </div>
         )}
 
