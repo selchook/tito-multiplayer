@@ -25,25 +25,25 @@ function Lobby({ onGameStart }) {
   const peerRef = useRef(null);
   const connRef = useRef(null);
 
-  // Check URL for room code on mount
+  // Check URL for host param on mount (shared invite link)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const code = params.get("room");
-    if (code) {
-      setJoinCode(code.toUpperCase());
+    if (params.get("host")) {
       setMode("join");
     }
   }, []);
 
-  // Auto-join when mode is 'join' and we have a code from URL
+  // Auto-join when mode is 'join' and host param exists in URL
   useEffect(() => {
-    if (mode === "join" && joinCode && !connRef.current) {
-      // Small delay to let UI render
-      const timer = setTimeout(() => handleJoin(), 300);
-      return () => clearTimeout(timer);
+    if (mode === "join" && !connRef.current) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("host")) {
+        const timer = setTimeout(() => handleJoin(), 300);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [mode, joinCode]);
+  }, [mode]);
 
   const initPeer = useCallback(() => {
     return new Promise((resolve, reject) => {
