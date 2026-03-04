@@ -1042,8 +1042,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const oppBtnLabel = isMultiplayer ? (myPlayer === 0 ? "P2" : "P1") : (turn === 0 ? "P2" : "P1");
   const myBtnColor  = myPlayer === 0 ? P1.accent : P2.accent;
   const oppBtnColor = myPlayer === 0 ? P2.accent : P1.accent;
-  // P1 is always left side, P2 is always right side — buttons follow the same order
-  const myIsLeft = isMultiplayer ? myPlayer === 0 : turn === 0;
+  // Active player's button is on their natural side; flips each turn
+  const myIsLeft = turn === myPlayer;
   const oppBtnName  = isMultiplayer ? oppDisplay.slice(0, 7) : oppBtnLabel;
 
 
@@ -1395,7 +1395,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
               cursor: "pointer",
               boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
-              transform: charging ? "scale(1.1)" : "scale(1)", transition: "all 0.15s", touchAction: "none", width: 160,
+              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", width: 160,
             }}
           >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
         ) : null}
