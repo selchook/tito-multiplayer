@@ -356,13 +356,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     nextWindRef.current = null;
     impactRef.current = null;
     currentSeedRef.current = state.seed || 0;
-    // Camera intro: hold at active player → pan to opponent → pan back
+    // Camera intro: hold at active player → pan to opponent → pan back (unless opponent shoots first)
     const myTank = (!isMultiplayer || myPlayer === 0) ? state.p1 : state.p2;
     const oppTank = (!isMultiplayer || myPlayer === 0) ? state.p2 : state.p1;
     const myX = Math.max(0, Math.min(WORLD_W - VIEW_W, myTank.x - VIEW_W / 2));
     const oppX = Math.max(0, Math.min(WORLD_W - VIEW_W, oppTank.x - VIEW_W / 2));
     setViewportX(myX);
-    setCameraIntro({ myX, oppX, oppTankX: oppTank.x, oppTankY: oppTank.y });
+    setCameraIntro({ myX, oppX, oppTankX: oppTank.x, oppTankY: oppTank.y, stayOnOpp: isMultiplayer && startingTurn !== myPlayer });
   }, [isMultiplayer, myPlayer]);
 
   // ─── SETUP + SYNC LEVEL ───────────────────────────────────
@@ -520,7 +520,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   // Sequence: hold on player 2s → pan to opp 1.3s → show arrow 1.5s → pan back 1.3s
   useEffect(() => {
     if (!cameraIntro) return;
-    const { myX, oppX, oppTankX, oppTankY } = cameraIntro;
+    const { myX, oppX, oppTankX, oppTankY, stayOnOpp } = cameraIntro;
     const timers = [];
     let rAFId = null;
     const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -544,8 +544,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         setIntroArrow({ x: oppTankX, y: oppTankY });
         timers.push(setTimeout(() => {
           setIntroArrow(null);
-          // Phase 4: pan back to player in 1.3s
-          pan(oppX, myX, 1300, () => setCameraIntro(null));
+          if (stayOnOpp) {
+            // Opponent shoots first — stay focused on them, end intro
+            setCameraIntro(null);
+          } else {
+            // Phase 4: pan back to own tank in 1.3s
+            pan(oppX, myX, 1300, () => setCameraIntro(null));
+          }
         }, 1500));
       });
     }, 1000));
@@ -1197,8 +1202,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
           {trail.map((t, i) => <circle key={i} cx={t.x} cy={t.y} r={3 * cameraZoom} fill="#fff" opacity={((i + 1) / trail.length) * 0.5} />)}
 
-          {p1.hp > 0 && <TankG t={p1} c={P1} name={p1Name} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} />}
-          {p2.hp > 0 && <TankG t={p2} c={P2} name={p2Name} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} />}
+          {p1.hp > 0 && <TankG t={p1} c={P1} name={p1Name} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} isMe={!isMultiplayer || myPlayer === 0} />}
+          {p2.hp > 0 && <TankG t={p2} c={P2} name={p2Name} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} isMe={!isMultiplayer || myPlayer === 1} />}
 
           {/* INTRO ARROW — red target indicator on opponent tank */}
           {introArrow && (() => {
@@ -1445,7 +1450,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 }
 
 // ─── TANK SVG COMPONENT ─────────────────────────────────────
-function TankG({ t, c, name, active, fr, recoil = 0 }) {
+function TankG({ t, c, name, active, fr, recoil = 0, isMe = false }) {
   const rad = ((fr ? -t.angle : -(180 - t.angle)) * Math.PI) / 180;
   const bx = t.x + Math.cos(rad) * 22, by = t.y - 8 + Math.sin(rad) * 22;
   const recoilProgress = Math.max(0, 1 - recoil / 15);
@@ -1466,6 +1471,7 @@ function TankG({ t, c, name, active, fr, recoil = 0 }) {
       <line x1={t.x} y1={t.y - 13} x2={bx} y2={by} stroke={c.accent} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
       {active && <circle cx={bx} cy={by} r="3" fill={c.accent} opacity="0.6"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="1s" repeatCount="indefinite" /></circle>}
       <text x={t.x} y={t.y + 18} textAnchor="middle" fill="#fff" fontSize="10" fontWeight="bold" fontFamily="monospace" opacity="0.9">{name}</text>
+      {isMe && <text x={t.x} y={t.y - 26} textAnchor="middle" fill={c.accent} fontSize="8" fontWeight="900" fontFamily="monospace" opacity="0.85">YOU</text>}
     </g>
   );
 }
