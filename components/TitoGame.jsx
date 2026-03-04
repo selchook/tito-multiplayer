@@ -1202,8 +1202,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
           {trail.map((t, i) => <circle key={i} cx={t.x} cy={t.y} r={3 * cameraZoom} fill="#fff" opacity={((i + 1) / trail.length) * 0.5} />)}
 
-          {p1.hp > 0 && <TankG t={p1} c={P1} name={p1Name} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} playerLabel="P1" />}
-          {p2.hp > 0 && <TankG t={p2} c={P2} name={p2Name} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} playerLabel="P2" />}
+          {p1.hp > 0 && <TankG t={p1} c={P1} active={turn === 0 && canAct} fr={true} recoil={firingEffect?.tankIdx === 0 ? firingEffect.frame : 0} playerLabel={!isMultiplayer || myPlayer === 0 ? "YOU" : ""} />}
+          {p2.hp > 0 && <TankG t={p2} c={P2} active={turn === 1 && canAct} fr={false} recoil={firingEffect?.tankIdx === 1 ? firingEffect.frame : 0} playerLabel={!isMultiplayer || myPlayer === 1 ? "YOU" : ""} />}
 
           {/* INTRO ARROW — red target indicator on opponent tank */}
           {introArrow && (() => {
@@ -1450,7 +1450,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 }
 
 // ─── TANK SVG COMPONENT ─────────────────────────────────────
-function TankG({ t, c, name, active, fr, recoil = 0, playerLabel = "" }) {
+function TankG({ t, c, active, fr, recoil = 0, playerLabel = "" }) {
   const rad = ((fr ? -t.angle : -(180 - t.angle)) * Math.PI) / 180;
   const bx = t.x + Math.cos(rad) * 22, by = t.y - 8 + Math.sin(rad) * 22;
   const recoilProgress = Math.max(0, 1 - recoil / 15);
@@ -1470,8 +1470,7 @@ function TankG({ t, c, name, active, fr, recoil = 0, playerLabel = "" }) {
       <line x1={t.x} y1={t.y - 13} x2={bx} y2={by} stroke={c.main} strokeWidth="4" strokeLinecap="round" />
       <line x1={t.x} y1={t.y - 13} x2={bx} y2={by} stroke={c.accent} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
       {active && <circle cx={bx} cy={by} r="3" fill={c.accent} opacity="0.6"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="1s" repeatCount="indefinite" /></circle>}
-      <text x={t.x} y={t.y + 18} textAnchor="middle" fill="#fff" fontSize="10" fontWeight="bold" fontFamily="monospace" opacity="0.9">{name}</text>
-      {playerLabel && <text x={t.x} y={t.y + 30} textAnchor="middle" fill={c.accent} fontSize="8" fontWeight="900" fontFamily="monospace" opacity="0.75">{playerLabel}</text>}
+      {playerLabel && <text x={t.x} y={t.y + 20} textAnchor="middle" fill={c.accent} fontSize="9" fontWeight="900" fontFamily="monospace" opacity="0.85">{playerLabel}</text>}
     </g>
   );
 }
