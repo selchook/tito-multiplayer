@@ -492,17 +492,22 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     };
 
     conn.on("data", handleData);
-    conn.on("close", () => {
-      setConnected(false);
-    });
-    conn.on("error", () => {
-      setConnected(false);
-    });
+    // Delay disconnect to tolerate brief iOS background suspension blips
+    conn.on("close", () => { setTimeout(() => setConnected(false), 5000); });
+    conn.on("error", () => { setTimeout(() => setConnected(false), 5000); });
 
     return () => {
       conn.off("data", handleData);
     };
   }, [isMultiplayer, conn, applyLevelState, setupAndSyncLevel]);
+
+  // Keep peer signaling socket alive in-game (iOS suspends WebSocket in background)
+  useEffect(() => {
+    if (!isMultiplayer || !peer) return;
+    const onDisconnected = () => { try { peer.reconnect(); } catch (_) {} };
+    peer.on("disconnected", onDisconnected);
+    return () => peer.off("disconnected", onDisconnected);
+  }, [isMultiplayer, peer]);
 
   // ─── REMOTE FIRE HANDLER ──────────────────────────────────
   // Uses the EXACT projectile state from the firing player — no local recomputation
@@ -1438,34 +1443,38 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
             flex-direction: column !important; align-items: center !important;
-            padding: 2px 4px !important; gap: 4px !important; align-self: start !important;
+            padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
+            overflow: hidden !important;
           }
-          .tito-vbtns { display: flex !important; gap: 4px !important; }
-          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 3px !important; justify-content: center !important; align-items: center !important; }
+          .tito-vbtns { display: flex !important; gap: 3px !important; }
+          .tito-vbtns button { height: 22px !important; padding: 2px 8px !important; font-size: 10px !important; }
+          /* Hide POSITION/ANGLE/POWER labels to save vertical space */
+          .tito-actctrl > div > span:first-child { display: none !important; }
+          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; overflow: hidden !important; width: 100% !important; }
           /* Angle/move/power buttons — compact */
-          .tito-ctrl button:not(.tito-fire-btn) { padding: 4px 6px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; height: 28px !important; }
-          /* Fire/action button — big square to fill right column */
+          .tito-ctrl button:not(.tito-fire-btn) { padding: 3px 5px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; height: 26px !important; }
+          /* Fire/action button — fills right column */
           .tito-fire-btn {
-            width: 100% !important; min-height: 54px !important;
-            font-size: 13px !important; letter-spacing: 1px !important;
-            padding: 6px 4px !important; border-radius: 8px !important;
+            width: 100% !important; min-height: 40px !important;
+            font-size: 12px !important; letter-spacing: 1px !important;
+            padding: 4px !important; border-radius: 8px !important;
             box-sizing: border-box !important;
           }
           /* Power group and bar — override inline fixed widths */
-          .tito-power-group { min-width: 0 !important; width: 100% !important; }
+          .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 1px !important; }
           .tito-power-bar { width: 100% !important; max-width: none !important; }
           /* Move/angle labels — shrink fixed-width inline divs */
-          .tito-move-label { width: 28px !important; font-size: 9px !important; }
-          .tito-angle-display { width: 36px !important; font-size: 14px !important; }
-          /* actctrl overflow guard */
-          .tito-actctrl { overflow: hidden !important; width: 100% !important; }
+          .tito-move-label { width: 26px !important; font-size: 9px !important; }
+          .tito-angle-display { width: 32px !important; font-size: 13px !important; }
+          /* Range hint below power bar */
+          .tito-power-group > span { display: none !important; }
           .tito-info { display: none !important; }
           .tito-minimap {
             grid-column: 2 !important; grid-row: 7 !important;
             padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
             overflow: hidden !important;
           }
-          .tito-minimap > div { height: 10px !important; overflow: hidden !important; }
+          .tito-minimap > div { height: 8px !important; overflow: hidden !important; }
         }
       `}</style>
 
