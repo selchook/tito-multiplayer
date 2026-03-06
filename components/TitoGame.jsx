@@ -1086,10 +1086,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       {/* HEADER — mobile-friendly stacked layout */}
       <div className="tito-header-padding" style={{ width: "100%", maxWidth: 820, padding: "6px 12px", boxSizing: "border-box" }}>
         {/* Top row: title + sound */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 3, background: "linear-gradient(135deg,#06b6d4,#f43f5e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>TITO'NUN TANKI</div>
-            <span style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>LVL {level}</span>
+        <div className="tito-title-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, overflow: "hidden" }}>
+            <div className="tito-game-title" style={{ fontSize: 18, fontWeight: 900, letterSpacing: 3, background: "linear-gradient(135deg,#06b6d4,#f43f5e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>TITO'NUN TANKI</div>
+            <span className="tito-lvl" style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap", flexShrink: 0 }}>LVL {level}</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
             <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14 }}>{snd ? "🔊" : "🔇"}</button>
@@ -1377,13 +1377,33 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             max-height: none !important; max-width: none !important;
           }
           /* Right column — rows 2-7 */
-          .tito-header-padding { grid-column: 2 !important; grid-row: 2 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
-          .tito-scoreboard { padding: 2px 4px !important; }
-          .tito-scoreboard span { font-size: 9px !important; }
+          .tito-header-padding {
+            grid-column: 2 !important; grid-row: 2 !important;
+            padding: 2px 4px !important; width: 100% !important;
+            box-sizing: border-box !important; overflow: hidden !important;
+          }
+          .tito-title-row { margin-bottom: 2px !important; gap: 2px !important; }
+          .tito-game-title { font-size: 10px !important; letter-spacing: 1px !important; }
+          .tito-lvl { display: none !important; }
+          .tito-title-row > div:last-child button { padding: 2px 5px !important; font-size: 11px !important; }
+          .tito-scoreboard {
+            padding: 2px 4px !important; border-radius: 4px !important;
+            flex-wrap: nowrap !important; gap: 0 !important;
+          }
+          .tito-scoreboard > div { gap: 2px !important; min-width: 0 !important; }
+          .tito-scoreboard span { font-size: 8px !important; max-width: 44px !important; }
+          .tito-scoreboard > div > div[style*="font-size: 20"] { font-size: 14px !important; min-width: 14px !important; }
           .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
-          .tito-wind { grid-column: 2 !important; grid-row: 3 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
+          .tito-wind {
+            grid-column: 2 !important; grid-row: 3 !important;
+            padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
+          }
           .tito-wind > div { height: 6px !important; }
-          .tito-msg { grid-column: 2 !important; grid-row: 4 !important; padding: 1px 2px !important; font-size: 9px !important; width: 100% !important; box-sizing: border-box !important; max-width: none !important; }
+          .tito-msg {
+            grid-column: 2 !important; grid-row: 4 !important;
+            padding: 1px 2px !important; font-size: 9px !important;
+            width: 100% !important; box-sizing: border-box !important; max-width: none !important;
+          }
           .tito-ctrl {
             grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
@@ -1392,9 +1412,20 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           }
           .tito-vbtns { display: flex !important; gap: 4px !important; }
           .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 3px !important; justify-content: center !important; align-items: center !important; }
-          .tito-ctrl button { padding: 4px 6px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; }
+          /* Angle/move/power buttons — compact */
+          .tito-ctrl button:not(.tito-fire-btn) { padding: 4px 6px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; height: 28px !important; }
+          /* Fire/action button — big square to fill right column */
+          .tito-fire-btn {
+            width: 100% !important; min-height: 54px !important;
+            font-size: 13px !important; letter-spacing: 1px !important;
+            padding: 6px 4px !important; border-radius: 8px !important;
+            box-sizing: border-box !important;
+          }
           .tito-info { display: none !important; }
-          .tito-minimap { grid-column: 2 !important; grid-row: 7 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
+          .tito-minimap {
+            grid-column: 2 !important; grid-row: 7 !important;
+            padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
+          }
           .tito-minimap > div { height: 10px !important; }
         }
       `}</style>
@@ -1450,11 +1481,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
         {/* Main action area */}
         {matchWinner !== null ? (
-          <button onClick={startNewMatch} style={{ padding: "16px 24px", borderRadius: 12, border: "2px solid #a855f7", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2, cursor: "pointer", boxShadow: "0 0 25px rgba(168,85,247,0.4)", minWidth: 160 }}>🏆 NEW MATCH</button>
+          <button className="tito-fire-btn" onClick={startNewMatch} style={{ padding: "16px 24px", borderRadius: 12, border: "2px solid #a855f7", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2, cursor: "pointer", boxShadow: "0 0 25px rgba(168,85,247,0.4)", minWidth: 160 }}>🏆 NEW MATCH</button>
         ) : isMultiplayer && !isMyTurn && phase === "aiming" ? (
-          <div style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
+          <div className="tito-fire-btn" style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
         ) : canAct ? (
           <button
+            className="tito-fire-btn"
             onPointerDown={startCharge} onPointerUp={releaseCharge}
             onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
             onContextMenu={e => e.preventDefault()}
