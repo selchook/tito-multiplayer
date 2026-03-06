@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 
-// Dynamic import to avoid SSR issues with PeerJS
 const TitoGame = dynamic(() => import("../components/TitoGame"), { ssr: false });
 
 // ─── GENERATE ROOM CODE ─────────────────────────────────────
@@ -14,22 +13,72 @@ function generateRoomCode() {
   return code;
 }
 
+// ─── ABLY CONN SHIM ──────────────────────────────────────────
+// Wraps an Ably channel with the same interface as a PeerJS DataConnection
+// so TitoGame.jsx needs zero changes.
+function createAblyConn(channel, myPlayer) {
+  const handlers = { data: [], close: [], error: [] };
+  let isOpen = true;
+
+  // Receive messages from the OTHER player only
+  channel.subscribe("msg", (msg) => {
+    if (!isOpen) return;
+    if (msg.data.from !== myPlayer) {
+      const { from, ...data } = msg.data;
+      handlers.data.forEach(h => h(data));
+    }
+  });
+
+  // Detect opponent disconnection via Ably presence
+  channel.presence.subscribe("leave", (member) => {
+    if (member.data?.player !== myPlayer) {
+      isOpen = false;
+      handlers.close.forEach(h => h());
+    }
+  });
+
+  // Enter presence so opponent can detect us
+  channel.presence.enter({ player: myPlayer }).catch(() => {});
+
+  return {
+    get open() { return isOpen; },
+    send(data) {
+      if (isOpen) channel.publish("msg", { ...data, from: myPlayer }).catch(() => {});
+    },
+    on(event, handler) {
+      if (handlers[event]) handlers[event].push(handler);
+    },
+    off(event, handler) {
+      if (handlers[event]) {
+        handlers[event] = handlers[event].filter(h => h !== handler);
+      }
+    },
+    destroy() {
+      isOpen = false;
+      channel.presence.leave().catch(() => {});
+      channel.unsubscribe();
+    },
+  };
+}
+
 // ─── LOBBY COMPONENT ────────────────────────────────────────
 const CONNECTION_TIMEOUT_MS = 60_000;
+const ABLY_KEY = process.env.NEXT_PUBLIC_ABLY_KEY;
 
 function Lobby({ onGameStart }) {
-  const [mode, setMode] = useState(null); // null | 'create' | 'join'
+  const [mode, setMode] = useState(null);
   const [roomCode, setRoomCode] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [countdown, setCountdown] = useState(null);
-  const peerRef = useRef(null);
-  const connRef = useRef(null);
+  const ablyRef = useRef(null);
+  const channelRef = useRef(null);
   const countdownRef = useRef(null);
+  const joinIntervalRef = useRef(null);
+  const gameStartedRef = useRef(false);
 
-  // Countdown timer helper
   const startCountdown = useCallback((onExpire) => {
     let secs = CONNECTION_TIMEOUT_MS / 1000;
     setCountdown(secs);
@@ -49,65 +98,56 @@ function Lobby({ onGameStart }) {
     setCountdown(null);
   }, []);
 
-  // Check URL for host param on mount (shared invite link)
+  const cleanupAbly = useCallback(() => {
+    clearInterval(joinIntervalRef.current);
+    stopCountdown();
+    try { channelRef.current?.unsubscribe(); } catch (_) {}
+    try { channelRef.current?.presence?.leave(); } catch (_) {}
+    try { ablyRef.current?.close(); } catch (_) {}
+    channelRef.current = null;
+    ablyRef.current = null;
+    gameStartedRef.current = false;
+  }, [stopCountdown]);
+
+  // Check URL for room param on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("host")) {
-      setMode("join");
-    }
+    if (params.get("room")) setMode("join");
   }, []);
 
-  // Auto-join when mode is 'join' and host param exists in URL
+  // Auto-join when mode is 'join' and room param exists
   useEffect(() => {
-    if (mode === "join" && !connRef.current) {
+    if (mode === "join") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("host")) {
+      if (params.get("room")) {
         const timer = setTimeout(() => handleJoin(), 300);
         return () => clearTimeout(timer);
       }
     }
   }, [mode]);
 
-  const initPeer = useCallback(() => {
+  const initAbly = useCallback(() => {
     return new Promise((resolve, reject) => {
-      import("peerjs").then(({ default: Peer }) => {
-        const peer = new Peer(undefined, {
-          debug: 0,
-          // Explicit PeerJS cloud config — needed for iOS WSS
-          host: "0.peerjs.com",
-          port: 443,
-          path: "/",
-          secure: true,
-          config: {
-            iceServers: [
-              // Google STUN — multiple for redundancy
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-              { urls: "stun:stun2.l.google.com:19302" },
-              { urls: "stun:stun3.l.google.com:19302" },
-              { urls: "stun:stun4.l.google.com:19302" },
-              // openrelay — UDP
-              { urls: "stun:openrelay.metered.ca:80" },
-              { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-              { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-              // openrelay — TCP (bypasses carrier NAT and firewalls that block UDP)
-              { urls: "turn:openrelay.metered.ca:80?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
-              { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
-              // TLS TURN (HTTPS port 443, almost never blocked)
-              { urls: "turns:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-              { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
-            ],
-            iceCandidatePoolSize: 10,
-            iceTransportPolicy: "all",
-            bundlePolicy: "max-bundle",
-            rtcpMuxPolicy: "require",
-          },
+      if (!ABLY_KEY) {
+        reject(new Error("NEXT_PUBLIC_ABLY_KEY not set in .env.local"));
+        return;
+      }
+      import("ably").then(({ default: Ably }) => {
+        const client = new Ably.Realtime({ key: ABLY_KEY, autoConnect: true });
+        const timeout = setTimeout(() => {
+          reject(new Error("Ably connection timed out"));
+        }, 10000);
+        client.connection.once("connected", () => {
+          clearTimeout(timeout);
+          ablyRef.current = client;
+          resolve(client);
         });
-        peer.on("open", (id) => resolve(peer));
-        peer.on("error", (err) => reject(err));
-        peerRef.current = peer;
-      });
+        client.connection.once("failed", () => {
+          clearTimeout(timeout);
+          reject(new Error("Ably connection failed — check your API key"));
+        });
+      }).catch(reject);
     });
   }, []);
 
@@ -115,52 +155,36 @@ function Lobby({ onGameStart }) {
     setMode("create");
     setStatus("Creating room...");
     setError("");
+    gameStartedRef.current = false;
     try {
-      const peer = await initPeer();
+      const ably = await initAbly();
       const code = generateRoomCode();
       setRoomCode(code);
       setStatus("Waiting for opponent...");
 
-      // Store peer ID mapping via the room code
-      // We'll use the peer ID directly in the connection
-      // Guest will connect using: host's peer ID
+      const channel = ably.channels.get(`game-${code}`);
+      channelRef.current = channel;
 
-      // Reconnect to signaling server if iOS drops the WebSocket in background
-      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
+      channel.subscribe("guest-join", () => {
+        if (gameStartedRef.current) return;
+        gameStartedRef.current = true;
+        stopCountdown();
+        const seed = Math.floor(Math.random() * 2147483647);
+        const conn = createAblyConn(channel, 0);
+        channel.publish("init", { seed });
+        onGameStart({ myPlayer: 0, seed, conn, peer: null, isHost: true, ably });
+      });
 
-      // Host-side 60s timeout — expire the room if no one joins
       startCountdown(() => {
-        if (!connRef.current?.open) {
+        if (!gameStartedRef.current) {
           setError("Room expired — no one joined within 60s.");
           setStatus("");
-          peerRef.current?.destroy();
-          peerRef.current = null;
+          cleanupAbly();
+          setMode(null);
         }
       });
 
-      peer.on("connection", (conn) => {
-        // Ignore duplicate connections (only first guest counts)
-        if (connRef.current?.open) return;
-        stopCountdown();
-        connRef.current = conn;
-        conn.on("open", () => {
-          // Send init message with game seed
-          const seed = Math.floor(Math.random() * 2147483647);
-          conn.send({ type: "init", seed, hostPeerId: peer.id });
-          onGameStart({
-            myPlayer: 0,
-            seed,
-            conn,
-            peer,
-            isHost: true,
-          });
-        });
-        conn.on("error", (err) => setError("Connection error: " + err.message));
-      });
-
-      // Store the peer ID as the room code mapping
-      // We encode the peer ID in the shareable link
-      window.history.replaceState({}, "", `?host=${peer.id}&code=${code}`);
+      window.history.replaceState({}, "", `?room=${code}`);
     } catch (err) {
       setError("Failed to create room: " + err.message);
       setStatus("");
@@ -168,59 +192,45 @@ function Lobby({ onGameStart }) {
   };
 
   const handleJoin = async () => {
-    if (!joinCode && !mode) return;
     setMode("join");
     setStatus("Connecting...");
     setError("");
+    gameStartedRef.current = false;
+
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get("room") || joinCode || "").toUpperCase().trim();
+
+    if (!code) {
+      setError("Enter a room code or use the host's invite link.");
+      setStatus("");
+      return;
+    }
+
     try {
-      const peer = await initPeer();
+      const ably = await initAbly();
+      const channel = ably.channels.get(`game-${code}`);
+      channelRef.current = channel;
 
-      // Reconnect to signaling server if iOS drops the WebSocket in background
-      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
-
-      // Get the host peer ID from URL params
-      const params = new URLSearchParams(window.location.search);
-      let hostPeerId = params.get("host");
-
-      if (!hostPeerId) {
-        setError("Invalid room link. Ask the host to share the full link.");
-        setStatus("");
-        return;
-      }
-
-      const conn = peer.connect(hostPeerId, {
-        reliable: true,
-        serialization: "json", // iOS Safari has issues with binary DataChannel
-      });
-      connRef.current = conn;
-
-      conn.on("open", () => {
+      channel.subscribe("init", (msg) => {
+        if (gameStartedRef.current) return;
+        gameStartedRef.current = true;
+        clearInterval(joinIntervalRef.current);
         stopCountdown();
-        setStatus("Connected! Waiting for game init...");
+        const conn = createAblyConn(channel, 1);
+        onGameStart({ myPlayer: 1, seed: msg.data.seed, conn, peer: null, isHost: false, ably });
       });
 
-      conn.on("data", (data) => {
-        if (data.type === "init") {
-          onGameStart({
-            myPlayer: 1,
-            seed: data.seed,
-            conn,
-            peer,
-            isHost: false,
-          });
-        }
-      });
+      // Publish guest-join repeatedly until host responds
+      const doJoin = () => {
+        if (!gameStartedRef.current) channel.publish("guest-join", { ts: Date.now() });
+      };
+      doJoin();
+      joinIntervalRef.current = setInterval(doJoin, 2000);
 
-      conn.on("error", (err) => {
-        stopCountdown();
-        setError("Connection failed: " + err.message);
-        setStatus("");
-      });
-
-      // 60s connection timeout
       startCountdown(() => {
-        if (!connRef.current?.open) {
-          setError("Connection timed out. Make sure the host is still waiting.");
+        if (!gameStartedRef.current) {
+          clearInterval(joinIntervalRef.current);
+          setError("Connection timed out. Make sure the host has the room open.");
           setStatus("");
         }
       });
@@ -232,7 +242,7 @@ function Lobby({ onGameStart }) {
 
   const shareUrl =
     typeof window !== "undefined" && roomCode
-      ? `${window.location.origin}?host=${peerRef.current?.id}&code=${roomCode}`
+      ? `${window.location.origin}?room=${roomCode}`
       : "";
 
   const whatsappUrl = shareUrl
@@ -498,10 +508,7 @@ function Lobby({ onGameStart }) {
       {mode && (
         <button
           onClick={() => {
-            stopCountdown();
-            peerRef.current?.destroy();
-            connRef.current = null;
-            peerRef.current = null;
+            cleanupAbly();
             setMode(null);
             setRoomCode("");
             setJoinCode("");
@@ -563,7 +570,8 @@ export default function Home() {
       peer={gameSession.peer}
       isHost={gameSession.isHost}
       onDisconnect={() => {
-        gameSession.peer?.destroy();
+        gameSession.conn?.destroy?.();
+        try { gameSession.ably?.close(); } catch (_) {}
         setGameSession(null);
         window.history.replaceState({}, "", window.location.pathname);
       }}

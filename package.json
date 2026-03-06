@@ -8,9 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
+    "ably": "^2.19.0",
     "next": "^14.2.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "peerjs": "^1.5.4"
+    "react-dom": "^18.2.0"
   }
 }
