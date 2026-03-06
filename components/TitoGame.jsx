@@ -301,18 +301,37 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   });
 
   // ─── FULLSCREEN ───────────────────────────────────────────
+  const isIOS = typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  const isPWA = typeof window !== "undefined" &&
+    (window.navigator.standalone === true ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: standalone)").matches);
+  const [iosHint, setIosHint] = useState(false);
+
   useEffect(() => {
+    if (isIOS || !document.fullscreenEnabled) return;
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
+  }, [isIOS]);
+
   const toggleFullscreen = useCallback(() => {
+    if (isIOS) {
+      if (!isPWA) {
+        setIosHint(true);
+        setTimeout(() => setIosHint(false), 4000);
+      }
+      return;
+    }
+    if (!document.fullscreenEnabled) return;
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     } else {
       document.exitFullscreen().catch(() => {});
     }
-  }, []);
+  }, [isIOS, isPWA]);
 
   // ─── MULTIPLAYER: IS IT MY TURN? ─────────────────────────
   const isMyTurn = !isMultiplayer || turn === myPlayer;
@@ -1093,8 +1112,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
             <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14 }}>{snd ? "🔊" : "🔇"}</button>
-            <button onClick={toggleFullscreen} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: "#64748b", cursor: "pointer", fontSize: 14 }}>{isFullscreen ? "⊠" : "⛶"}</button>
+            {!isPWA && (
+              <button onClick={toggleFullscreen} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: isIOS ? "#f59e0b" : "#64748b", cursor: "pointer", fontSize: 14 }} title={isIOS ? "Add to Home Screen for fullscreen" : "Fullscreen"}>
+                {isIOS ? "⊞" : isFullscreen ? "⊠" : "⛶"}
+              </button>
+            )}
           </div>
+          {iosHint && (
+            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1e293b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 16px", fontSize: 12, color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, zIndex: 2000, whiteSpace: "nowrap", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }}>
+              Safari: Share → Add to Home Screen for fullscreen
+            </div>
+          )}
         </div>
 
         {/* Scoreboard row: P1 score | vs | P2 score — full width */}

@@ -3,6 +3,12 @@ import "./globals.css";
 export const metadata = {
   title: "Tito'nun Tankı - Multiplayer",
   description: "Online multiplayer tank battle game",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TitoTank",
+  },
 };
 
 export const viewport = {
