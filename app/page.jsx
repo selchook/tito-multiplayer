@@ -188,6 +188,7 @@ function Lobby({ onGameStart }) {
         fontFamily: "'JetBrains Mono','SF Mono',monospace",
         color: "#e2e8f0",
         padding: 20,
+        overflowY: "auto",
       }}
     >
       {/* Title */}

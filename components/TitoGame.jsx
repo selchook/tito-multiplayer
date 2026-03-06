@@ -276,6 +276,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const [cameraZoom, setCameraZoom] = useState(1);
   const [cameraIntro, setCameraIntro] = useState(null); // { myX, oppX, oppTankX, oppTankY }
   const [introArrow, setIntroArrow] = useState(null); // { x, y } | null
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const projRef = useRef(null);
   const animRef = useRef(null);
@@ -298,6 +299,20 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     const rng = createSeededRandom(initialSeed + 999);
     return Array.from({ length: 15 }, () => ({ x: rng() * WORLD_W, y: 20 + rng() * 60, s: 0.5 + rng() * 0.8 }));
   });
+
+  // ─── FULLSCREEN ───────────────────────────────────────────
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   // ─── MULTIPLAYER: IS IT MY TURN? ─────────────────────────
   const isMyTurn = !isMultiplayer || turn === myPlayer;
@@ -1048,7 +1063,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
 
   return (
-    <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", touchAction: "none" }}>
+    <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", overflowY: "auto" }}>
       
       {/* MULTIPLAYER CONNECTION STATUS BAR */}
       {isMultiplayer && (
@@ -1069,14 +1084,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       )}
 
       {/* HEADER — mobile-friendly stacked layout */}
-      <div style={{ width: "100%", maxWidth: 820, padding: "6px 12px", boxSizing: "border-box" }}>
+      <div className="tito-header-padding" style={{ width: "100%", maxWidth: 820, padding: "6px 12px", boxSizing: "border-box" }}>
         {/* Top row: title + sound */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 3, background: "linear-gradient(135deg,#06b6d4,#f43f5e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", whiteSpace: "nowrap" }}>TITO'NUN TANKI</div>
             <span style={{ fontSize: 9, color: "#475569", whiteSpace: "nowrap" }}>LVL {level}</span>
           </div>
-          <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>{snd ? "🔊" : "🔇"}</button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+            <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14 }}>{snd ? "🔊" : "🔇"}</button>
+            <button onClick={toggleFullscreen} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: "#64748b", cursor: "pointer", fontSize: 14 }}>{isFullscreen ? "⊠" : "⛶"}</button>
+          </div>
         </div>
 
         {/* Scoreboard row: P1 score | vs | P2 score — full width */}
@@ -1326,6 +1344,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-ctrl { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; justify-content: center !important; gap: 8px !important; }
           .tito-vbtns { display: contents !important; }
           .tito-actctrl { display: contents !important; }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+          .tito-header-padding { padding: 2px 12px !important; }
+          .tito-header-title { font-size: 14px !important; }
+          .tito-wind-bar { padding: 2px 12px !important; }
+          .tito-msg-bar { padding: 2px 0 !important; font-size: 10px !important; }
         }
       `}</style>
 

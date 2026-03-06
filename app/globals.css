@@ -7,4 +7,5 @@
 body {
   background: #0a0a1a;
   overflow-x: hidden;
+  overflow-y: auto;
 }
