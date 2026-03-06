@@ -81,19 +81,24 @@ function Lobby({ onGameStart }) {
           secure: true,
           config: {
             iceServers: [
-              // Google STUN
+              // Google STUN — multiple for redundancy
               { urls: "stun:stun.l.google.com:19302" },
               { urls: "stun:stun1.l.google.com:19302" },
-              // freestun.net — dedicated free TURN, more reliable than openrelay
-              { urls: "stun:freestun.net:3479" },
-              { urls: "turn:freestun.net:3479", username: "free", credential: "free" },
-              { urls: "turns:freestun.net:5350", username: "free", credential: "free" },
-              // openrelay.metered.ca — backup TURN
+              { urls: "stun:stun2.l.google.com:19302" },
+              { urls: "stun:stun3.l.google.com:19302" },
+              { urls: "stun:stun4.l.google.com:19302" },
+              // openrelay — UDP
               { urls: "stun:openrelay.metered.ca:80" },
               { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
               { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+              // openrelay — TCP (bypasses carrier NAT and firewalls that block UDP)
+              { urls: "turn:openrelay.metered.ca:80?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+              // TLS TURN (HTTPS port 443, almost never blocked)
               { urls: "turns:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
             ],
+            iceCandidatePoolSize: 10,
             iceTransportPolicy: "all",
             bundlePolicy: "max-bundle",
             rtcpMuxPolicy: "require",
@@ -134,6 +139,8 @@ function Lobby({ onGameStart }) {
       });
 
       peer.on("connection", (conn) => {
+        // Ignore duplicate connections (only first guest counts)
+        if (connRef.current?.open) return;
         stopCountdown();
         connRef.current = conn;
         conn.on("open", () => {
@@ -168,6 +175,9 @@ function Lobby({ onGameStart }) {
     try {
       const peer = await initPeer();
 
+      // Reconnect to signaling server if iOS drops the WebSocket in background
+      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
+
       // Get the host peer ID from URL params
       const params = new URLSearchParams(window.location.search);
       let hostPeerId = params.get("host");
@@ -177,9 +187,6 @@ function Lobby({ onGameStart }) {
         setStatus("");
         return;
       }
-
-      // Reconnect to signaling server if iOS drops the WebSocket in background
-      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
 
       const conn = peer.connect(hostPeerId, {
         reliable: true,
