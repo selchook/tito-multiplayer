@@ -1063,11 +1063,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
 
   return (
-    <div style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", overflowY: "auto" }}>
+    <div className="tito-root" style={{ background: "#0a0a1a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "'JetBrains Mono','SF Mono',monospace", color: "#e2e8f0", userSelect: "none", overflowY: "auto" }}>
       
       {/* MULTIPLAYER CONNECTION STATUS BAR */}
       {isMultiplayer && (
-        <div style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 12px", boxSizing: "border-box", background: connected ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", borderBottom: `1px solid ${connected ? "#166534" : "#991b1b"}` }}>
+        <div className="tito-status-bar" style={{ width: "100%", maxWidth: 820, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 12px", boxSizing: "border-box", background: connected ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", borderBottom: `1px solid ${connected ? "#166534" : "#991b1b"}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: connected ? "#22c55e" : "#ef4444" }} />
             <span style={{ fontSize: 10, color: connected ? "#22c55e" : "#ef4444" }}>
@@ -1098,7 +1098,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </div>
 
         {/* Scoreboard row: P1 score | vs | P2 score — full width */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, background: "rgba(15,23,42,0.6)", borderRadius: 8, padding: "6px 8px", border: "1px solid #1e293b" }}>
+        <div className="tito-scoreboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, background: "rgba(15,23,42,0.6)", borderRadius: 8, padding: "6px 8px", border: "1px solid #1e293b" }}>
           {/* P1 side */}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
@@ -1125,7 +1125,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
       {/* WIND BAR */}
-      <div style={{ width: "100%", maxWidth: 820, display: "flex", alignItems: "center", gap: 8, padding: "5px 12px", boxSizing: "border-box", background: "rgba(10,10,26,0.95)", borderTop: "1px solid #1e293b" }}>
+      <div className="tito-wind" style={{ width: "100%", maxWidth: 820, display: "flex", alignItems: "center", gap: 8, padding: "5px 12px", boxSizing: "border-box", background: "rgba(10,10,26,0.95)", borderTop: "1px solid #1e293b" }}>
         <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2, whiteSpace: "nowrap" }}>WIND</span>
         <div style={{ flex: 1, position: "relative", height: 10, background: "#0f172a", borderRadius: 5, border: "1px solid #1e293b", overflow: "hidden" }}>
           <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "#334155" }} />
@@ -1147,10 +1147,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </span>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
+      <div className="tito-msg" style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
 
       {/* SVG CANVAS */}
-      <div style={{ border: "1px solid #1e293b", borderRadius: 8, overflow: "hidden", marginTop: 4, maxWidth: "100%" }}>
+      <div className="tito-canvas-wrap" style={{ border: "1px solid #1e293b", borderRadius: 8, overflow: "hidden", marginTop: 4, maxWidth: "100%" }}>
         <svg ref={svgRef} width={VIEW_W} height={H} viewBox={`${viewportX} ${viewportY} ${VIEW_W * cameraZoom} ${H * cameraZoom}`} onPointerDown={handleSvgDown}
           style={{ display: "block", background: "linear-gradient(180deg,#0f172a 0%,#1e1b4b 40%,#312e81 70%,#1e1b4b 100%)", touchAction: "none", maxWidth: "100%", height: "auto" }}>
           <defs>
@@ -1345,11 +1345,54 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-vbtns { display: contents !important; }
           .tito-actctrl { display: contents !important; }
         }
+
+        /* ── LANDSCAPE FIT: everything in one viewport height ── */
         @media (orientation: landscape) and (max-height: 500px) {
-          .tito-header-padding { padding: 2px 12px !important; }
-          .tito-header-title { font-size: 14px !important; }
-          .tito-wind-bar { padding: 2px 12px !important; }
-          .tito-msg-bar { padding: 2px 0 !important; font-size: 10px !important; }
+          /* Root fills screen exactly, no scroll */
+          .tito-root {
+            min-height: 100dvh !important;
+            height: 100dvh !important;
+            overflow: hidden !important;
+          }
+          /* Status bar — ultra compact */
+          .tito-status-bar { padding: 1px 8px !important; font-size: 8px !important; }
+          /* Header — tighter */
+          .tito-header-padding { padding: 2px 8px !important; margin-bottom: 0 !important; }
+          .tito-header-padding > div:first-child { margin-bottom: 0 !important; }
+          .tito-scoreboard { padding: 2px 6px !important; border-radius: 4px !important; }
+          .tito-scoreboard span { font-size: 9px !important; }
+          /* Wind bar */
+          .tito-wind { padding: 2px 8px !important; }
+          .tito-wind > div { height: 6px !important; }
+          /* Message bar */
+          .tito-msg { padding: 1px 0 !important; font-size: 9px !important; }
+          /* Canvas grows to fill remaining space */
+          .tito-canvas-wrap {
+            flex: 1 !important;
+            min-height: 0 !important;
+            margin-top: 1px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+          }
+          /* SVG scales to fit the flex container height */
+          .tito-canvas-wrap svg {
+            max-height: 100% !important;
+            width: auto !important;
+            height: 100% !important;
+          }
+          /* Controls — compact single row */
+          .tito-ctrl { padding: 2px 6px !important; gap: 3px !important; flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; justify-content: center !important; }
+          .tito-vbtns { display: contents !important; }
+          .tito-actctrl { display: contents !important; gap: 4px !important; }
+          /* Smaller control buttons */
+          .tito-ctrl button { padding: 4px 8px !important; font-size: 10px !important; min-width: unset !important; width: auto !important; }
+          /* Hide non-essential info */
+          .tito-info { display: none !important; }
+          /* Compact minimap */
+          .tito-minimap { padding: 2px 8px !important; }
+          .tito-minimap > div { height: 10px !important; }
         }
       `}</style>
 
@@ -1426,12 +1469,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
 
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
+      <div className="tito-info" style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
         💀 ANY HIT = INSTANT DEATH &nbsp;•&nbsp; 🏆 FIRST TO {WIN_SCORE} WINS!
       </div>
 
       {/* World Position Indicator */}
-      <div style={{ width: "100%", maxWidth: 820, padding: "8px 16px", boxSizing: "border-box" }}>
+      <div className="tito-minimap" style={{ width: "100%", maxWidth: 820, padding: "8px 16px", boxSizing: "border-box" }}>
         <div
           style={{ position: "relative", width: "100%", height: 16, background: "#1e293b", borderRadius: 4, overflow: "hidden", cursor: "grab", userSelect: "none" }}
           onPointerDown={(e) => {

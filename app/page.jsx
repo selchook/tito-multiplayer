@@ -178,6 +178,7 @@ function Lobby({ onGameStart }) {
 
   return (
     <div
+      className="lobby-wrap"
       style={{
         background: "#0a0a1a",
         minHeight: "100vh",
@@ -193,6 +194,7 @@ function Lobby({ onGameStart }) {
     >
       {/* Title */}
       <div
+        className="lobby-title"
         style={{
           fontSize: 36,
           fontWeight: 900,
@@ -206,6 +208,7 @@ function Lobby({ onGameStart }) {
         TITO'NUN TANKI
       </div>
       <div
+        className="lobby-sub"
         style={{
           fontSize: 14,
           color: "#64748b",
@@ -459,6 +462,12 @@ function Lobby({ onGameStart }) {
           50% {
             opacity: 1;
           }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+          .lobby-title { font-size: 22px !important; letter-spacing: 3px !important; margin-bottom: 2px !important; }
+          .lobby-sub { font-size: 11px !important; margin-bottom: 12px !important; }
+          .lobby-btn { padding: 10px 16px !important; font-size: 13px !important; }
+          .lobby-wrap { padding: 10px !important; justify-content: flex-start !important; padding-top: 16px !important; }
         }
       `}</style>
     </div>
