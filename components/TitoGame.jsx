@@ -1346,52 +1346,55 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-actctrl { display: contents !important; }
         }
 
-        /* ── LANDSCAPE FIT: everything in one viewport height ── */
+        /* ── LANDSCAPE FIT: CSS Grid two-column layout ── */
         @media (orientation: landscape) and (max-height: 500px) {
-          /* Root fills screen exactly, no scroll */
+          /* Root: fixed height, CSS Grid */
           .tito-root {
             min-height: 100dvh !important;
             height: 100dvh !important;
             overflow: hidden !important;
+            display: grid !important;
+            grid-template-columns: 1fr 158px !important;
+            grid-template-rows: auto auto auto auto minmax(0,1fr) auto auto !important;
+            align-items: start !important;
+            padding: 0 !important;
+            gap: 0 !important;
           }
-          /* Status bar — ultra compact */
-          .tito-status-bar { padding: 1px 8px !important; font-size: 8px !important; }
-          /* Header — tighter */
-          .tito-header-padding { padding: 2px 8px !important; margin-bottom: 0 !important; }
-          .tito-header-padding > div:first-child { margin-bottom: 0 !important; }
-          .tito-scoreboard { padding: 2px 6px !important; border-radius: 4px !important; }
-          .tito-scoreboard span { font-size: 9px !important; }
-          /* Wind bar */
-          .tito-wind { padding: 2px 8px !important; }
-          .tito-wind > div { height: 6px !important; }
-          /* Message bar */
-          .tito-msg { padding: 1px 0 !important; font-size: 9px !important; }
-          /* Canvas grows to fill remaining space */
+          /* Row 1: status bar — full width */
+          .tito-status-bar {
+            grid-column: 1 / -1 !important; grid-row: 1 !important;
+            padding: 1px 6px !important; font-size: 8px !important;
+          }
+          /* Left column: canvas spans rows 2–end */
           .tito-canvas-wrap {
-            flex: 1 !important;
-            min-height: 0 !important;
-            margin-top: 1px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            overflow: hidden !important;
+            grid-column: 1 !important; grid-row: 2 / -1 !important;
+            margin: 0 !important; border-radius: 4px 0 0 4px !important;
+            max-width: none !important; height: 100% !important;
+            display: flex !important; align-items: stretch !important;
           }
-          /* SVG scales to fit the flex container height */
           .tito-canvas-wrap svg {
-            max-height: 100% !important;
-            width: auto !important;
-            height: 100% !important;
+            height: 100% !important; width: 100% !important;
+            max-height: none !important; max-width: none !important;
           }
-          /* Controls — compact single row */
-          .tito-ctrl { padding: 2px 6px !important; gap: 3px !important; flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; justify-content: center !important; }
-          .tito-vbtns { display: contents !important; }
-          .tito-actctrl { display: contents !important; gap: 4px !important; }
-          /* Smaller control buttons */
-          .tito-ctrl button { padding: 4px 8px !important; font-size: 10px !important; min-width: unset !important; width: auto !important; }
-          /* Hide non-essential info */
+          /* Right column — rows 2-7 */
+          .tito-header-padding { grid-column: 2 !important; grid-row: 2 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
+          .tito-scoreboard { padding: 2px 4px !important; }
+          .tito-scoreboard span { font-size: 9px !important; }
+          .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
+          .tito-wind { grid-column: 2 !important; grid-row: 3 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
+          .tito-wind > div { height: 6px !important; }
+          .tito-msg { grid-column: 2 !important; grid-row: 4 !important; padding: 1px 2px !important; font-size: 9px !important; width: 100% !important; box-sizing: border-box !important; max-width: none !important; }
+          .tito-ctrl {
+            grid-column: 2 !important; grid-row: 5 !important;
+            width: 100% !important; box-sizing: border-box !important; max-width: none !important;
+            flex-direction: column !important; align-items: center !important;
+            padding: 2px 4px !important; gap: 4px !important; align-self: start !important;
+          }
+          .tito-vbtns { display: flex !important; gap: 4px !important; }
+          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 3px !important; justify-content: center !important; align-items: center !important; }
+          .tito-ctrl button { padding: 4px 6px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; }
           .tito-info { display: none !important; }
-          /* Compact minimap */
-          .tito-minimap { padding: 2px 8px !important; }
+          .tito-minimap { grid-column: 2 !important; grid-row: 7 !important; padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important; }
           .tito-minimap > div { height: 10px !important; }
         }
       `}</style>
