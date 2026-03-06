@@ -1383,14 +1383,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
         /* ── LANDSCAPE FIT: CSS Grid two-column layout ── */
         @media (orientation: landscape) and (max-height: 500px) {
-          /* Root: fixed height, CSS Grid */
+          /* Root: fixed height, 2-col grid (canvas left, controls right) */
           .tito-root {
             min-height: 100dvh !important;
             height: 100dvh !important;
             overflow: hidden !important;
             display: grid !important;
-            grid-template-columns: 1fr 158px !important;
-            grid-template-rows: auto auto auto auto minmax(0,1fr) auto auto !important;
+            grid-template-columns: 1fr 162px !important;
+            grid-template-rows: auto auto auto auto minmax(0,1fr) auto !important;
             align-items: start !important;
             padding: 0 !important;
             gap: 0 !important;
@@ -1411,66 +1411,70 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             height: 100% !important; width: 100% !important;
             max-height: none !important; max-width: none !important;
           }
-          /* Right column — rows 2-7 */
+          /* Right column — rows 2-6 */
           .tito-header-padding {
             grid-column: 2 !important; grid-row: 2 !important;
             padding: 2px 4px !important; width: 100% !important;
             box-sizing: border-box !important; overflow: hidden !important;
           }
-          .tito-title-row { margin-bottom: 2px !important; gap: 2px !important; }
-          .tito-game-title { font-size: 10px !important; letter-spacing: 1px !important; }
+          .tito-title-row { margin-bottom: 1px !important; gap: 2px !important; }
+          .tito-game-title { font-size: 9px !important; letter-spacing: 1px !important; }
           .tito-lvl { display: none !important; }
-          .tito-title-row > div:last-child button { padding: 2px 5px !important; font-size: 11px !important; }
+          .tito-title-row > div:last-child button { padding: 1px 4px !important; font-size: 10px !important; }
           .tito-scoreboard {
-            padding: 2px 4px !important; border-radius: 4px !important;
+            padding: 1px 3px !important; border-radius: 4px !important;
             flex-wrap: nowrap !important; gap: 0 !important;
           }
           .tito-scoreboard > div { gap: 2px !important; min-width: 0 !important; }
-          .tito-scoreboard span { font-size: 8px !important; max-width: 44px !important; }
-          .tito-scoreboard > div > div[style*="font-size: 20"] { font-size: 14px !important; min-width: 14px !important; }
+          .tito-scoreboard span { font-size: 7px !important; max-width: 38px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+          .tito-scoreboard > div > div[style*="font-size: 20"] { font-size: 12px !important; min-width: 12px !important; }
+          /* Hide pip dots in landscape to save space */
+          .tito-scoreboard > div > div:last-child > div,
+          .tito-scoreboard > div > div:first-child > div { display: none !important; }
           .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
           .tito-wind {
             grid-column: 2 !important; grid-row: 3 !important;
-            padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
+            padding: 1px 4px !important; width: 100% !important; box-sizing: border-box !important;
           }
-          .tito-wind > div { height: 6px !important; }
+          .tito-wind > div { height: 5px !important; }
+          .tito-wind span { font-size: 8px !important; }
           .tito-msg {
             grid-column: 2 !important; grid-row: 4 !important;
-            padding: 1px 2px !important; font-size: 9px !important;
+            padding: 1px 2px !important; font-size: 8px !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
           }
+          /* Controls: column-REVERSE so fire button renders at TOP (always visible) */
           .tito-ctrl {
             grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
-            flex-direction: column !important; align-items: center !important;
+            flex-direction: column-reverse !important; align-items: center !important;
             padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
-            overflow: hidden !important;
+            overflow: visible !important;
           }
           .tito-vbtns { display: flex !important; gap: 3px !important; }
-          .tito-vbtns button { height: 22px !important; padding: 2px 8px !important; font-size: 10px !important; }
+          .tito-vbtns button { height: 20px !important; padding: 1px 6px !important; font-size: 9px !important; }
           /* Hide POSITION/ANGLE/POWER labels to save vertical space */
           .tito-actctrl > div > span:first-child { display: none !important; }
-          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; overflow: hidden !important; width: 100% !important; }
-          /* Angle/move/power buttons — compact */
-          .tito-ctrl button:not(.tito-fire-btn) { padding: 3px 5px !important; font-size: 10px !important; width: auto !important; min-width: unset !important; height: 26px !important; }
-          /* Fire/action button — fills right column */
+          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
+          /* Compact control buttons */
+          .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
+          /* Fire button at top of reversed column */
           .tito-fire-btn {
-            width: 100% !important; min-height: 40px !important;
-            font-size: 12px !important; letter-spacing: 1px !important;
-            padding: 4px !important; border-radius: 8px !important;
+            width: 100% !important; min-height: 38px !important;
+            font-size: 11px !important; letter-spacing: 1px !important;
+            padding: 3px !important; border-radius: 8px !important;
             box-sizing: border-box !important;
           }
-          /* Power group and bar — override inline fixed widths */
+          /* Power group and bar */
           .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 1px !important; }
           .tito-power-bar { width: 100% !important; max-width: none !important; }
-          /* Move/angle labels — shrink fixed-width inline divs */
-          .tito-move-label { width: 26px !important; font-size: 9px !important; }
-          .tito-angle-display { width: 32px !important; font-size: 13px !important; }
-          /* Range hint below power bar */
+          .tito-move-label { width: 24px !important; font-size: 8px !important; }
+          .tito-angle-display { width: 30px !important; font-size: 12px !important; }
           .tito-power-group > span { display: none !important; }
           .tito-info { display: none !important; }
+          /* Minimap: row 6 (right after ctrl row) */
           .tito-minimap {
-            grid-column: 2 !important; grid-row: 7 !important;
+            grid-column: 2 !important; grid-row: 6 !important;
             padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
             overflow: hidden !important;
           }
