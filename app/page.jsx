@@ -50,27 +50,29 @@ function Lobby({ onGameStart }) {
       import("peerjs").then(({ default: Peer }) => {
         const peer = new Peer(undefined, {
           debug: 0,
+          // Explicit PeerJS cloud config — needed for iOS WSS
+          host: "0.peerjs.com",
+          port: 443,
+          path: "/",
+          secure: true,
           config: {
             iceServers: [
+              // Google STUN
               { urls: "stun:stun.l.google.com:19302" },
               { urls: "stun:stun1.l.google.com:19302" },
+              // freestun.net — dedicated free TURN, more reliable than openrelay
+              { urls: "stun:freestun.net:3479" },
+              { urls: "turn:freestun.net:3479", username: "free", credential: "free" },
+              { urls: "turns:freestun.net:5350", username: "free", credential: "free" },
+              // openrelay.metered.ca — backup TURN
               { urls: "stun:openrelay.metered.ca:80" },
-              {
-                urls: "turn:openrelay.metered.ca:80",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-              {
-                urls: "turn:openrelay.metered.ca:443",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-              {
-                urls: "turns:openrelay.metered.ca:443",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
+              { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turns:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
             ],
+            iceTransportPolicy: "all",
+            bundlePolicy: "max-bundle",
+            rtcpMuxPolicy: "require",
           },
         });
         peer.on("open", (id) => resolve(peer));
@@ -93,6 +95,9 @@ function Lobby({ onGameStart }) {
       // Store peer ID mapping via the room code
       // We'll use the peer ID directly in the connection
       // Guest will connect using: host's peer ID
+
+      // Reconnect to signaling server if iOS drops the WebSocket in background
+      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
 
       peer.on("connection", (conn) => {
         connRef.current = conn;
@@ -138,7 +143,13 @@ function Lobby({ onGameStart }) {
         return;
       }
 
-      const conn = peer.connect(hostPeerId, { reliable: true });
+      // Reconnect to signaling server if iOS drops the WebSocket in background
+      peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
+
+      const conn = peer.connect(hostPeerId, {
+        reliable: true,
+        serialization: "json", // iOS Safari has issues with binary DataChannel
+      });
       connRef.current = conn;
 
       conn.on("open", () => {
