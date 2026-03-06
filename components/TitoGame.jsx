@@ -1112,17 +1112,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
             <button onClick={() => setSnd(s => !s)} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: snd ? "#22d3ee" : "#475569", cursor: "pointer", fontSize: 14 }}>{snd ? "🔊" : "🔇"}</button>
-            {!isPWA && (
-              <button onClick={toggleFullscreen} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: isIOS ? "#f59e0b" : "#64748b", cursor: "pointer", fontSize: 14 }} title={isIOS ? "Add to Home Screen for fullscreen" : "Fullscreen"}>
-                {isIOS ? "⊞" : isFullscreen ? "⊠" : "⛶"}
-              </button>
-            )}
+            <button onClick={toggleFullscreen} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: "#64748b", cursor: "pointer", fontSize: 14 }}>{isFullscreen ? "⊠" : "⛶"}</button>
           </div>
-          {iosHint && (
-            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1e293b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 16px", fontSize: 12, color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, zIndex: 2000, whiteSpace: "nowrap", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }}>
-              Safari: Share → Add to Home Screen for fullscreen
-            </div>
-          )}
         </div>
 
         {/* Scoreboard row: P1 score | vs | P2 score — full width */}
