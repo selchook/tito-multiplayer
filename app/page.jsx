@@ -15,6 +15,8 @@ function generateRoomCode() {
 }
 
 // ─── LOBBY COMPONENT ────────────────────────────────────────
+const CONNECTION_TIMEOUT_MS = 60_000;
+
 function Lobby({ onGameStart }) {
   const [mode, setMode] = useState(null); // null | 'create' | 'join'
   const [roomCode, setRoomCode] = useState("");
@@ -22,8 +24,30 @@ function Lobby({ onGameStart }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [countdown, setCountdown] = useState(null);
   const peerRef = useRef(null);
   const connRef = useRef(null);
+  const countdownRef = useRef(null);
+
+  // Countdown timer helper
+  const startCountdown = useCallback((onExpire) => {
+    let secs = CONNECTION_TIMEOUT_MS / 1000;
+    setCountdown(secs);
+    countdownRef.current = setInterval(() => {
+      secs--;
+      setCountdown(secs);
+      if (secs <= 0) {
+        clearInterval(countdownRef.current);
+        setCountdown(null);
+        onExpire();
+      }
+    }, 1000);
+  }, []);
+
+  const stopCountdown = useCallback(() => {
+    clearInterval(countdownRef.current);
+    setCountdown(null);
+  }, []);
 
   // Check URL for host param on mount (shared invite link)
   useEffect(() => {
@@ -99,7 +123,18 @@ function Lobby({ onGameStart }) {
       // Reconnect to signaling server if iOS drops the WebSocket in background
       peer.on("disconnected", () => { try { peer.reconnect(); } catch (_) {} });
 
+      // Host-side 60s timeout — expire the room if no one joins
+      startCountdown(() => {
+        if (!connRef.current?.open) {
+          setError("Room expired — no one joined within 60s.");
+          setStatus("");
+          peerRef.current?.destroy();
+          peerRef.current = null;
+        }
+      });
+
       peer.on("connection", (conn) => {
+        stopCountdown();
         connRef.current = conn;
         conn.on("open", () => {
           // Send init message with game seed
@@ -153,6 +188,7 @@ function Lobby({ onGameStart }) {
       connRef.current = conn;
 
       conn.on("open", () => {
+        stopCountdown();
         setStatus("Connected! Waiting for game init...");
       });
 
@@ -169,17 +205,18 @@ function Lobby({ onGameStart }) {
       });
 
       conn.on("error", (err) => {
+        stopCountdown();
         setError("Connection failed: " + err.message);
         setStatus("");
       });
 
-      // Timeout
-      setTimeout(() => {
+      // 60s connection timeout
+      startCountdown(() => {
         if (!connRef.current?.open) {
           setError("Connection timed out. Make sure the host is still waiting.");
           setStatus("");
         }
-      }, 60000);
+      });
     } catch (err) {
       setError("Failed to connect: " + err.message);
       setStatus("");
@@ -396,7 +433,7 @@ function Lobby({ onGameStart }) {
                 animation: "pulse 1.5s infinite",
               }}
             />
-            {status}
+            {status}{countdown !== null && ` (${countdown}s)`}
           </div>
         </div>
       )}
@@ -428,7 +465,7 @@ function Lobby({ onGameStart }) {
                 animation: "pulse 1.5s infinite",
               }}
             />
-            {status || "Preparing to join..."}
+            {status || "Preparing to join..."}{countdown !== null && ` (${countdown}s)`}
           </div>
         </div>
       )}
@@ -454,6 +491,7 @@ function Lobby({ onGameStart }) {
       {mode && (
         <button
           onClick={() => {
+            stopCountdown();
             peerRef.current?.destroy();
             connRef.current = null;
             peerRef.current = null;

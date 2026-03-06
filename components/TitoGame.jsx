@@ -1365,6 +1365,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-actctrl { display: contents !important; }
         }
 
+        /* ── PORTRAIT MOBILE: prevent overflow, responsive controls ── */
+        @media (max-width: 499px) {
+          .tito-root { overflow-x: hidden !important; }
+          .tito-ctrl { overflow: hidden !important; padding: 4px 6px !important; }
+          .tito-actctrl { gap: 6px !important; row-gap: 6px !important; }
+          .tito-power-group { min-width: 0 !important; width: 100% !important; }
+          .tito-power-bar { width: 100% !important; max-width: none !important; }
+          .tito-minimap { padding: 4px 8px !important; overflow: hidden !important; }
+          .tito-minimap > div { overflow: hidden !important; }
+        }
+
         /* ── LANDSCAPE FIT: CSS Grid two-column layout ── */
         @media (orientation: landscape) and (max-height: 500px) {
           /* Root: fixed height, CSS Grid */
@@ -1440,12 +1451,21 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             padding: 6px 4px !important; border-radius: 8px !important;
             box-sizing: border-box !important;
           }
+          /* Power group and bar — override inline fixed widths */
+          .tito-power-group { min-width: 0 !important; width: 100% !important; }
+          .tito-power-bar { width: 100% !important; max-width: none !important; }
+          /* Move/angle labels — shrink fixed-width inline divs */
+          .tito-move-label { width: 28px !important; font-size: 9px !important; }
+          .tito-angle-display { width: 36px !important; font-size: 14px !important; }
+          /* actctrl overflow guard */
+          .tito-actctrl { overflow: hidden !important; width: 100% !important; }
           .tito-info { display: none !important; }
           .tito-minimap {
             grid-column: 2 !important; grid-row: 7 !important;
             padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
+            overflow: hidden !important;
           }
-          .tito-minimap > div { height: 10px !important; }
+          .tito-minimap > div { height: 10px !important; overflow: hidden !important; }
         }
       `}</style>
 
@@ -1462,12 +1482,12 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
         {/* Active controls row — only shown when it's your turn */}
         {canAct && (
-          <div className="tito-actctrl" style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+          <div className="tito-actctrl" style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap", width: "100%" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
               <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button onPointerDown={() => setTankMoving(-1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>⬅</button>
-                <div style={{ width: 44, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
+                <div className="tito-move-label" style={{ width: 44, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
                 <button onPointerDown={() => setTankMoving(1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>➡</button>
               </div>
             </div>
@@ -1476,14 +1496,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button onClick={() => nudgeAngle(-5)} style={{...btn}}>◀</button>
-                <div style={{ width: 44, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
+                <div className="tito-angle-display" style={{ width: 44, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
                 <button onClick={() => nudgeAngle(5)} style={{...btn}}>▶</button>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
+            <div className="tito-power-group" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
               <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
-              <div style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
+              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
                 <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
                 <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
               </div>
