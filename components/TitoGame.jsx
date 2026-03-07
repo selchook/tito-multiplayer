@@ -1460,10 +1460,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
           /* Fire button below actctrl (below power bar) */
           .tito-fire-btn {
-            width: 100% !important; min-height: 38px !important;
+            width: 100% !important; height: 48px !important;
             font-size: 11px !important; letter-spacing: 1px !important;
             padding: 3px !important; border-radius: 8px !important;
-            box-sizing: border-box !important;
+            box-sizing: border-box !important; white-space: nowrap !important;
           }
           /* Power group and bar */
           .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 1px !important; }
@@ -1549,7 +1549,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
               cursor: "pointer",
               boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
-              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", width: 160,
+              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", minWidth: 190, height: 52, whiteSpace: "nowrap",
             }}
           >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
         ) : null}
