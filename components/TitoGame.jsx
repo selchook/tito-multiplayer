@@ -1473,6 +1473,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-angle-display { width: 30px !important; font-size: 12px !important; }
           .tito-power-group > span { display: none !important; }
           .tito-info { display: none !important; }
+          .tito-fire-labels { display: flex !important; }
           /* Minimap: row 6 (right after ctrl row) */
           .tito-minimap {
             grid-column: 2 !important; grid-row: 6 !important;
@@ -1554,6 +1555,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             }}
           >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
         ) : null}
+        <div className="tito-fire-labels" style={{ display: "none", width: "100%", justifyContent: "space-between", padding: "0 4px", boxSizing: "border-box" }}>
+          <span style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", fontWeight: 700 }}>LOW</span>
+          <span style={{ fontSize: 9, color: "#facc15", fontFamily: "monospace", fontWeight: 700 }}>MED</span>
+          <span style={{ fontSize: 9, color: "#ef4444", fontFamily: "monospace", fontWeight: 700 }}>HI</span>
+        </div>
       </div>
 
 
