@@ -1443,11 +1443,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             padding: 1px 2px !important; font-size: 8px !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
           }
-          /* Controls: column-REVERSE so fire button renders at TOP (always visible) */
+          /* Controls: column so fire button renders BELOW the power bar */
           .tito-ctrl {
             grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
-            flex-direction: column-reverse !important; align-items: center !important;
+            flex-direction: column !important; align-items: center !important;
             padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
             overflow: visible !important;
           }
@@ -1458,7 +1458,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
           /* Compact control buttons */
           .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
-          /* Fire button at top of reversed column */
+          /* Fire button below actctrl (below power bar) */
           .tito-fire-btn {
             width: 100% !important; min-height: 38px !important;
             font-size: 11px !important; letter-spacing: 1px !important;
