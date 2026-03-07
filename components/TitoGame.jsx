@@ -1516,6 +1516,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             </div>
 
             <div className="tito-power-group" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
+              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
+                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
+                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
+              </div>
               {charging ? (
                 <div style={{ display: "flex", gap: 8 }}>
                   {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
@@ -1523,11 +1528,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               ) : (
                 <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
               )}
-              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
-              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
-                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
-                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
-              </div>
             </div>
           </div>
         )}
