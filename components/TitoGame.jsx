@@ -1458,11 +1458,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
           /* Compact control buttons */
           .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
-          /* LOW/MED/MAX labels under fire button */
-          .tito-fire-labels {
-            display: flex !important; gap: 16px !important; justify-content: center !important;
-            width: 100% !important; padding: 1px 0 !important;
-          }
           /* Fire button below actctrl (below power bar) */
           .tito-fire-btn {
             width: 100% !important; height: 34px !important;
@@ -1521,11 +1516,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             </div>
 
             <div className="tito-power-group" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
-              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
-              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
-                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
-                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
-              </div>
               {charging ? (
                 <div style={{ display: "flex", gap: 8 }}>
                   {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
@@ -1533,6 +1523,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
               ) : (
                 <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
               )}
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
+              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
+                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
+                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
+              </div>
             </div>
           </div>
         )}
@@ -1543,28 +1538,21 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         ) : isMultiplayer && !isMyTurn && phase === "aiming" ? (
           <div className="tito-fire-btn" style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
         ) : canAct ? (
-          <>
-            <button
-              className="tito-fire-btn"
-              onPointerDown={startCharge} onPointerUp={releaseCharge}
-              onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
-              onContextMenu={e => e.preventDefault()}
-              style={{
-                padding: "16px 24px", borderRadius: 12, border: "2px solid",
-                borderColor: charging ? chgColor : aC.main,
-                background: charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
-                color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
-                cursor: "pointer",
-                boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
-                transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", minWidth: 190, height: 52, whiteSpace: "nowrap",
-              }}
-            >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
-            <div className="tito-fire-labels" style={{ display: "none" }}>
-              {["LOW", "MED", "MAX"].map((l, i) => (
-                <span key={i} style={{ fontSize: 9, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>
-              ))}
-            </div>
-          </>
+          <button
+            className="tito-fire-btn"
+            onPointerDown={startCharge} onPointerUp={releaseCharge}
+            onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
+            onContextMenu={e => e.preventDefault()}
+            style={{
+              padding: "16px 24px", borderRadius: 12, border: "2px solid",
+              borderColor: charging ? chgColor : aC.main,
+              background: charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
+              color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
+              cursor: "pointer",
+              boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
+              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", minWidth: 190, height: 52, whiteSpace: "nowrap",
+            }}
+          >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
         ) : null}
       </div>
 
