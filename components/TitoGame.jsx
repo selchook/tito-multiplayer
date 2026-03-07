@@ -1449,7 +1449,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
             flex-direction: column !important; align-items: center !important;
             padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
-            overflow: visible !important;
+            overflow: hidden !important;
           }
           .tito-vbtns { display: flex !important; gap: 3px !important; }
           .tito-vbtns button { height: 20px !important; padding: 1px 6px !important; font-size: 9px !important; }
@@ -1460,9 +1460,10 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
           /* Fire button below actctrl (below power bar) */
           .tito-fire-btn {
-            width: 100% !important; height: 48px !important;
-            font-size: 11px !important; letter-spacing: 1px !important;
-            padding: 3px !important; border-radius: 8px !important;
+            width: 100% !important; height: 34px !important;
+            min-width: unset !important; min-height: unset !important;
+            font-size: 10px !important; letter-spacing: 0px !important;
+            padding: 2px 4px !important; border-radius: 6px !important;
             box-sizing: border-box !important; white-space: nowrap !important;
           }
           /* Power group and bar */
