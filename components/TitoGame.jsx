@@ -1081,8 +1081,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
   const oppBtnLabel = isMultiplayer ? (myPlayer === 0 ? "P2" : "P1") : (turn === 0 ? "P2" : "P1");
   const myBtnColor  = myPlayer === 0 ? P1.accent : P2.accent;
   const oppBtnColor = myPlayer === 0 ? P2.accent : P1.accent;
-  // Active player's button is on their natural side; flips each turn
-  const myIsLeft = turn === myPlayer;
+  // YOU button always on the same side as your tank: P0 = left, P1 = right
+  const myIsLeft = isMultiplayer ? myPlayer === 0 : turn === 0;
   const oppBtnName  = isMultiplayer ? oppDisplay.slice(0, 7) : oppBtnLabel;
 
 
