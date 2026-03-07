@@ -1381,102 +1381,108 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-minimap > div { overflow: hidden !important; }
         }
 
-        /* ── LANDSCAPE FIT: CSS Grid two-column layout ── */
+        /* ── LANDSCAPE FIT: flex-column, same pattern as portrait ── */
         @media (orientation: landscape) and (max-height: 500px) {
-          /* Root: fixed height, 2-col grid (canvas left, controls right) */
+          /* Root: flex column, canvas fills middle, controls below */
           .tito-root {
-            min-height: 100dvh !important;
             height: 100dvh !important;
+            min-height: unset !important;
             overflow: hidden !important;
-            display: grid !important;
-            grid-template-columns: 1fr 162px !important;
-            grid-template-rows: auto auto auto auto minmax(0,1fr) auto !important;
-            align-items: start !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
             padding: 0 !important;
-            gap: 0 !important;
           }
-          /* Row 1: status bar — full width */
           .tito-status-bar {
-            grid-column: 1 / -1 !important; grid-row: 1 !important;
-            padding: 1px 6px !important; font-size: 8px !important;
+            flex-shrink: 0 !important;
+            padding: 1px 8px !important; font-size: 8px !important;
           }
-          /* Left column: canvas spans rows 2–end */
-          .tito-canvas-wrap {
-            grid-column: 1 !important; grid-row: 2 / -1 !important;
-            margin: 0 !important; border-radius: 4px 0 0 4px !important;
-            max-width: none !important; height: 100% !important;
-            display: flex !important; align-items: stretch !important;
-          }
-          .tito-canvas-wrap svg {
-            height: 100% !important; width: 100% !important;
-            max-height: none !important; max-width: none !important;
-          }
-          /* Right column — rows 2-6 */
           .tito-header-padding {
-            grid-column: 2 !important; grid-row: 2 !important;
-            padding: 2px 4px !important; width: 100% !important;
-            box-sizing: border-box !important; overflow: hidden !important;
-          }
-          .tito-title-row { margin-bottom: 1px !important; gap: 2px !important; }
-          .tito-game-title { font-size: 9px !important; letter-spacing: 1px !important; }
-          .tito-lvl { display: none !important; }
-          .tito-title-row > div:last-child button { padding: 1px 4px !important; font-size: 10px !important; }
-          .tito-scoreboard {
-            padding: 1px 3px !important; border-radius: 4px !important;
-            flex-wrap: nowrap !important; gap: 0 !important;
-          }
-          .tito-scoreboard > div { gap: 2px !important; min-width: 0 !important; }
-          .tito-scoreboard span { font-size: 7px !important; max-width: 38px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-          .tito-scoreboard > div > div[style*="font-size: 20"] { font-size: 12px !important; min-width: 12px !important; }
-          /* Hide pip dots in landscape to save space */
-          .tito-scoreboard > div > div:last-child > div,
-          .tito-scoreboard > div > div:first-child > div { display: none !important; }
-          .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
-          .tito-wind {
-            grid-column: 2 !important; grid-row: 3 !important;
-            padding: 1px 4px !important; width: 100% !important; box-sizing: border-box !important;
-          }
-          .tito-wind > div { height: 5px !important; }
-          .tito-wind span { font-size: 8px !important; }
-          .tito-msg {
-            grid-column: 2 !important; grid-row: 4 !important;
-            padding: 1px 2px !important; font-size: 8px !important;
-            width: 100% !important; box-sizing: border-box !important; max-width: none !important;
-          }
-          /* Controls: column-REVERSE so fire button renders at TOP (always visible) */
-          .tito-ctrl {
-            grid-column: 2 !important; grid-row: 5 !important;
-            width: 100% !important; box-sizing: border-box !important; max-width: none !important;
-            flex-direction: column-reverse !important; align-items: center !important;
-            padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
-            overflow: visible !important;
-          }
-          .tito-vbtns { display: flex !important; gap: 3px !important; }
-          .tito-vbtns button { height: 20px !important; padding: 1px 6px !important; font-size: 9px !important; }
-          /* Hide POSITION/ANGLE/POWER labels to save vertical space */
-          .tito-actctrl > div > span:first-child { display: none !important; }
-          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
-          /* Compact control buttons */
-          .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
-          /* Fire button at top of reversed column */
-          .tito-fire-btn {
-            width: 100% !important; min-height: 38px !important;
-            font-size: 11px !important; letter-spacing: 1px !important;
-            padding: 3px !important; border-radius: 8px !important;
+            flex-shrink: 0 !important;
+            padding: 2px 8px !important; width: 100% !important; max-width: none !important;
             box-sizing: border-box !important;
           }
-          /* Power group and bar */
-          .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 1px !important; }
-          .tito-power-bar { width: 100% !important; max-width: none !important; }
-          .tito-move-label { width: 24px !important; font-size: 8px !important; }
-          .tito-angle-display { width: 30px !important; font-size: 12px !important; }
-          .tito-power-group > span { display: none !important; }
-          .tito-info { display: none !important; }
-          /* Minimap: row 6 (right after ctrl row) */
-          .tito-minimap {
-            grid-column: 2 !important; grid-row: 6 !important;
-            padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
+          .tito-title-row { margin-bottom: 1px !important; }
+          .tito-game-title { font-size: 10px !important; letter-spacing: 1px !important; }
+          .tito-lvl { display: none !important; }
+          .tito-title-row > div:last-child button { padding: 2px 5px !important; font-size: 10px !important; }
+          .tito-scoreboard { padding: 2px 6px !important; flex-wrap: nowrap !important; gap: 0 !important; }
+          .tito-scoreboard > div { gap: 3px !important; min-width: 0 !important; }
+          .tito-scoreboard span { font-size: 8px !important; max-width: 52px !important; }
+          .tito-scoreboard > div > div[style*="font-size: 20"] { font-size: 14px !important; min-width: 16px !important; }
+          .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
+          .tito-wind {
+            flex-shrink: 0 !important;
+            padding: 2px 8px !important; width: 100% !important; max-width: none !important;
+            box-sizing: border-box !important;
+          }
+          .tito-wind > div { height: 6px !important; }
+          .tito-msg {
+            flex-shrink: 0 !important;
+            padding: 1px 0 !important; font-size: 9px !important;
+            width: 100% !important; max-width: none !important; box-sizing: border-box !important;
+          }
+          /* Canvas fills all remaining height */
+          .tito-canvas-wrap {
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important; margin-top: 2px !important;
+            max-width: none !important; width: 100% !important;
             overflow: hidden !important;
+          }
+          .tito-canvas-wrap svg {
+            width: 100% !important; height: 100% !important;
+            max-width: none !important; max-height: none !important;
+          }
+          /* Controls: flex COLUMN — actctrl row, then fire button below */
+          .tito-ctrl {
+            flex-shrink: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important; max-width: none !important;
+            padding: 3px 8px !important; gap: 3px !important;
+            box-sizing: border-box !important;
+          }
+          /* View buttons: compact centred row */
+          .tito-vbtns {
+            display: flex !important;
+            justify-content: center !important;
+            gap: 8px !important;
+          }
+          .tito-vbtns button { padding: 3px 14px !important; height: 26px !important; font-size: 10px !important; }
+          /* actctrl: horizontal row — position | angle | power side by side */
+          .tito-actctrl {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: center !important;
+            align-items: flex-end !important;
+            gap: 10px !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+          }
+          .tito-ctrl button:not(.tito-fire-btn) {
+            padding: 3px 8px !important; height: 28px !important;
+            font-size: 10px !important; min-width: unset !important; width: auto !important;
+          }
+          /* Power group and bar */
+          .tito-power-group { min-width: 0 !important; width: 110px !important; gap: 2px !important; }
+          .tito-power-bar { width: 100% !important; max-width: none !important; }
+          .tito-move-label { width: 26px !important; }
+          .tito-angle-display { width: 34px !important; font-size: 14px !important; }
+          .tito-power-group > span { display: none !important; }
+          /* Fire button: full-width row BELOW the actctrl (below power bar) */
+          .tito-fire-btn {
+            width: 100% !important; min-height: 36px !important;
+            font-size: 12px !important; letter-spacing: 1px !important;
+            padding: 4px !important; border-radius: 8px !important;
+            box-sizing: border-box !important;
+          }
+          .tito-info { display: none !important; }
+          .tito-minimap {
+            flex-shrink: 0 !important;
+            padding: 2px 8px !important; width: 100% !important; max-width: none !important;
+            box-sizing: border-box !important; overflow: hidden !important;
           }
           .tito-minimap > div { height: 8px !important; overflow: hidden !important; }
         }
