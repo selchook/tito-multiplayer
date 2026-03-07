@@ -1557,7 +1557,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
 
 
       <div className="tito-info" style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
-        💀 ANY HIT = INSTANT DEATH &nbsp;•&nbsp; 🏆 FIRST TO {WIN_SCORE} WINS!
+        💀 ANY HIT = INSTANT DEATH <br /> 🏆 FIRST TO {WIN_SCORE} WINS!
       </div>
 
       {/* World Position Indicator */}
