@@ -1532,7 +1532,8 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             max-height: 100% !important;
             width: 100% !important; box-sizing: border-box !important;
           }
-          .tito-right-col * { touch-action: pan-y !important; }
+          /* Prevent children from shrinking — they should scroll, not collapse */
+          .tito-right-col > * { flex-shrink: 0 !important; touch-action: pan-y !important; }
           .tito-fire-btn, .tito-ctrl button { touch-action: none !important; }
           /* Left column: canvas spans rows 2–end */
           .tito-canvas-wrap {
@@ -1549,7 +1550,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           /* Right column children — no individual grid placement needed, right-col handles it */
           .tito-header-padding {
             padding: 2px 4px !important; width: 100% !important;
-            box-sizing: border-box !important; overflow: hidden !important;
+            box-sizing: border-box !important;
             order: unset !important;
           }
           .tito-title-row { margin-bottom: 1px !important; gap: 2px !important; }
