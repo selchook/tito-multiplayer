@@ -1389,7 +1389,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             height: 100dvh !important;
             overflow: hidden !important;
             display: grid !important;
-            grid-template-columns: 1fr 162px !important;
+            grid-template-columns: 1fr 190px !important;
             grid-template-rows: auto auto auto auto minmax(0,1fr) auto !important;
             align-items: start !important;
             padding: 0 !important;
@@ -1448,29 +1448,30 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
             flex-direction: column !important; align-items: center !important;
-            padding: 2px 4px !important; gap: 2px !important; align-self: start !important;
+            padding: 4px 6px !important; gap: 4px !important; align-self: start !important;
             overflow: hidden !important;
           }
-          .tito-vbtns { display: flex !important; gap: 3px !important; }
-          .tito-vbtns button { height: 20px !important; padding: 1px 6px !important; font-size: 9px !important; }
+          .tito-vbtns { display: flex !important; gap: 4px !important; }
+          .tito-vbtns button { height: 28px !important; padding: 2px 10px !important; font-size: 10px !important; }
           /* Hide POSITION/ANGLE/POWER labels to save vertical space */
           .tito-actctrl > div > span:first-child { display: none !important; }
-          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
-          /* Compact control buttons */
-          .tito-ctrl button:not(.tito-fire-btn) { padding: 2px 4px !important; font-size: 9px !important; width: auto !important; min-width: unset !important; height: 24px !important; }
-          /* Fire button below actctrl (below power bar) */
+          .tito-actctrl { display: flex !important; flex-wrap: wrap !important; gap: 4px !important; justify-content: center !important; align-items: center !important; width: 100% !important; }
+          /* Control buttons — taller and easier to tap */
+          .tito-ctrl button:not(.tito-fire-btn) { padding: 4px 8px !important; font-size: 11px !important; width: auto !important; min-width: unset !important; height: 32px !important; }
+          /* Fire button — taller with margin above to separate from controls */
           .tito-fire-btn {
-            width: 100% !important; height: 34px !important;
+            width: 100% !important; height: 46px !important;
             min-width: unset !important; min-height: unset !important;
-            font-size: 10px !important; letter-spacing: 0px !important;
-            padding: 2px 4px !important; border-radius: 6px !important;
+            font-size: 12px !important; letter-spacing: 0px !important;
+            padding: 4px 6px !important; border-radius: 8px !important;
             box-sizing: border-box !important; white-space: nowrap !important;
+            margin-top: 6px !important;
           }
           /* Power group and bar */
-          .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 1px !important; }
-          .tito-power-bar { width: 100% !important; max-width: none !important; }
-          .tito-move-label { width: 24px !important; font-size: 8px !important; }
-          .tito-angle-display { width: 30px !important; font-size: 12px !important; }
+          .tito-power-group { min-width: 0 !important; width: 100% !important; gap: 2px !important; }
+          .tito-power-bar { width: 100% !important; max-width: none !important; height: 22px !important; }
+          .tito-move-label { width: 28px !important; font-size: 9px !important; }
+          .tito-angle-display { width: 34px !important; font-size: 14px !important; }
           .tito-power-group > span { display: none !important; }
           .tito-info { display: none !important; }
           /* Minimap: row 6 (right after ctrl row) */
