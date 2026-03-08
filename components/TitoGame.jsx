@@ -317,6 +317,23 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, [isIOS]);
 
+  // Auto-fullscreen on mobile when rotated to landscape
+  useEffect(() => {
+    if (isIOS || !document.fullscreenEnabled) return;
+    const isMobile = navigator.maxTouchPoints > 0;
+    if (!isMobile) return;
+    const handleOrientationChange = () => {
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    };
+    window.addEventListener("resize", handleOrientationChange);
+    // Check immediately in case already landscape
+    handleOrientationChange();
+    return () => window.removeEventListener("resize", handleOrientationChange);
+  }, [isIOS]);
+
   const toggleFullscreen = useCallback(() => {
     if (isIOS) {
       if (!isPWA) {
