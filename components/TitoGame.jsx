@@ -317,19 +317,6 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, [isIOS]);
 
-  // Auto-fullscreen on mobile: piggyback on first tap when in landscape.
-  // Browsers block requestFullscreen() outside a user gesture — resize/orientationchange won't work.
-  useEffect(() => {
-    if (isIOS || !document.fullscreenEnabled) return;
-    if (navigator.maxTouchPoints === 0) return;
-    const handlePointer = () => {
-      if (window.innerWidth > window.innerHeight && !document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    };
-    document.addEventListener("pointerdown", handlePointer);
-    return () => document.removeEventListener("pointerdown", handlePointer);
-  }, [isIOS]);
 
   const toggleFullscreen = useCallback(() => {
     if (isIOS) {
