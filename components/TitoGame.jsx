@@ -1121,6 +1121,9 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
         </div>
       )}
 
+      {/* RIGHT COLUMN (scrollable in landscape) */}
+      <div className="tito-right-col">
+
       {/* HEADER — mobile-friendly stacked layout */}
       <div className="tito-header-padding" style={{ width: "100%", maxWidth: 820, padding: "6px 12px", boxSizing: "border-box" }}>
         {/* Top row: title + sound */}
@@ -1186,6 +1189,118 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
       <div className="tito-msg" style={{ width: "100%", maxWidth: 820, textAlign: "center", padding: "5px 0", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: aC.accent, background: `linear-gradient(90deg,transparent,${aC.glow},transparent)` }}>{msg}</div>
+
+      {/* CONTROLS */}
+      <div className="tito-ctrl" style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", boxSizing: "border-box", gap: 6 }}>
+
+        {/* View buttons — always shown during aiming / flying phases */}
+        {(phase === "aiming" || phase === "flying") && matchWinner === null && (
+          <div className="tito-vbtns" style={{ display: "flex", gap: 6, justifyContent: "center", flexDirection: myIsLeft ? "row" : "row-reverse" }}>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>YOU</button>
+            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
+          </div>
+        )}
+
+        {/* Active controls row — only shown when it's your turn */}
+        {canAct && (
+          <div className="tito-actctrl" style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap", width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onPointerDown={() => setTankMoving(-1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>⬅</button>
+                <div className="tito-move-label" style={{ width: 44, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
+                <button onPointerDown={() => setTankMoving(1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>➡</button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => nudgeAngle(-5)} style={{...btn}}>◀</button>
+                <div className="tito-angle-display" style={{ width: 44, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
+                <button onClick={() => nudgeAngle(5)} style={{...btn}}>▶</button>
+              </div>
+            </div>
+
+            <div className="tito-power-group" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
+              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
+              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
+                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
+                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
+              </div>
+              {charging ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
+                </div>
+              ) : (
+                <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Main action area */}
+        {matchWinner !== null ? (
+          <button className="tito-fire-btn" onClick={startNewMatch} style={{ padding: "16px 24px", borderRadius: 12, border: "2px solid #a855f7", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2, cursor: "pointer", boxShadow: "0 0 25px rgba(168,85,247,0.4)", minWidth: 160 }}>🏆 NEW MATCH</button>
+        ) : isMultiplayer && !isMyTurn && phase === "aiming" ? (
+          <div className="tito-fire-btn" style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
+        ) : canAct ? (
+          <button
+            className="tito-fire-btn"
+            onPointerDown={startCharge} onPointerUp={releaseCharge}
+            onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
+            onContextMenu={e => e.preventDefault()}
+            style={{
+              padding: "16px 24px", borderRadius: 12, border: "2px solid",
+              borderColor: charging ? chgColor : aC.main,
+              background: charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
+              color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
+              cursor: "pointer",
+              boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
+              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", minWidth: 190, height: 52, whiteSpace: "nowrap",
+            }}
+          >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
+        ) : null}
+      </div>
+
+      <div className="tito-info" style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
+        💀 ANY HIT = INSTANT DEATH <br /> 🏆 FIRST TO {WIN_SCORE} WINS!
+      </div>
+
+      {/* World Position Indicator */}
+      <div className="tito-minimap" style={{ width: "100%", maxWidth: 820, padding: "8px 16px", boxSizing: "border-box" }}>
+        <div
+          style={{ position: "relative", width: "100%", height: 16, background: "#1e293b", borderRadius: 4, overflow: "hidden", cursor: "grab", userSelect: "none" }}
+          onPointerDown={(e) => {
+            if (phase !== "aiming") return;
+            setMinimapDragging(true);
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickPercent = clickX / rect.width;
+            const targetWorldX = clickPercent * WORLD_W;
+            const newViewportX = Math.max(0, Math.min(WORLD_W - VIEW_W, targetWorldX - VIEW_W / 2));
+            setViewportX(newViewportX);
+          }}
+          onPointerMove={(e) => {
+            if (!minimapDragging || phase !== "aiming") return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickPercent = Math.max(0, Math.min(1, clickX / rect.width));
+            const targetWorldX = clickPercent * WORLD_W;
+            const newViewportX = Math.max(0, Math.min(WORLD_W - VIEW_W, targetWorldX - VIEW_W / 2));
+            setViewportX(newViewportX);
+          }}
+          onPointerUp={() => setMinimapDragging(false)}
+          onPointerLeave={() => setMinimapDragging(false)}
+        >
+          <div style={{ position: "absolute", left: `${Math.min(p1.x, p2.x) / WORLD_W * 100}%`, width: `${Math.abs(p2.x - p1.x) / WORLD_W * 100}%`, top: "50%", height: 1, background: "rgba(250,204,21,0.3)", transform: "translateY(-50%)" }} />
+          <div style={{ position: "absolute", left: `${(p1.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P1.accent, boxShadow: `0 0 8px ${P1.accent}` }} />
+          <div style={{ position: "absolute", left: `${(p2.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P2.accent, boxShadow: `0 0 8px ${P2.accent}` }} />
+          <div style={{ position: "absolute", left: `${(viewportX / WORLD_W) * 100}%`, top: 0, width: `${(VIEW_W / WORLD_W) * 100}%`, height: "100%", background: cameraDragging ? "rgba(100,200,255,0.2)" : "rgba(255,255,255,0.1)", border: cameraDragging ? "1px solid #64c8ff" : "1px solid rgba(255,255,255,0.3)" }} />
+        </div>
+      </div>
+
+      </div>{/* end tito-right-col */}
 
       {/* SVG CANVAS */}
       <div className="tito-canvas-wrap" style={{ border: "1px solid #1e293b", borderRadius: 8, overflow: "hidden", marginTop: 4, maxWidth: "100%" }}>
@@ -1378,6 +1493,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
       </div>
 
       <style>{`
+        /* right-col is invisible to layout in portrait; canvas/ctrl use order to get correct visual position */
+        .tito-right-col { display: contents; }
+        .tito-canvas-wrap { order: 1; }
+        .tito-ctrl, .tito-info, .tito-minimap { order: 2; }
+
         @media (min-width: 600px) {
           .tito-ctrl { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; justify-content: center !important; gap: 8px !important; }
           .tito-vbtns { display: contents !important; }
@@ -1404,7 +1524,7 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             overflow: hidden !important;
             display: grid !important;
             grid-template-columns: 1fr 190px !important;
-            grid-template-rows: auto auto auto auto minmax(0,1fr) auto !important;
+            grid-template-rows: auto 1fr !important;
             align-items: start !important;
             padding: 0 !important;
             gap: 0 !important;
@@ -1414,9 +1534,17 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             grid-column: 1 / -1 !important; grid-row: 1 !important;
             padding: 1px 6px !important; font-size: 8px !important;
           }
+          /* Right column: single scrollable flex container */
+          .tito-right-col {
+            grid-column: 2 !important; grid-row: 2 / -1 !important;
+            display: flex !important; flex-direction: column !important;
+            overflow-y: auto !important; overflow-x: hidden !important;
+            height: 100% !important; width: 100% !important; box-sizing: border-box !important;
+          }
           /* Left column: canvas spans rows 2–end */
           .tito-canvas-wrap {
             grid-column: 1 !important; grid-row: 2 / -1 !important;
+            order: unset !important;
             margin: 0 !important; border-radius: 4px 0 0 4px !important;
             max-width: none !important; height: 100% !important;
             display: flex !important; align-items: stretch !important;
@@ -1425,11 +1553,11 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             height: 100% !important; width: 100% !important;
             max-height: none !important; max-width: none !important;
           }
-          /* Right column — rows 2-6 */
+          /* Right column children — no individual grid placement needed, right-col handles it */
           .tito-header-padding {
-            grid-column: 2 !important; grid-row: 2 !important;
             padding: 2px 4px !important; width: 100% !important;
             box-sizing: border-box !important; overflow: hidden !important;
+            order: unset !important;
           }
           .tito-title-row { margin-bottom: 1px !important; gap: 2px !important; }
           .tito-game-title { font-size: 9px !important; letter-spacing: 1px !important; }
@@ -1447,20 +1575,18 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-scoreboard > div > div:first-child > div { display: none !important; }
           .tito-header-padding > div:first-child { margin-bottom: 1px !important; }
           .tito-wind {
-            grid-column: 2 !important; grid-row: 3 !important;
             padding: 1px 4px !important; width: 100% !important; box-sizing: border-box !important;
           }
           .tito-wind > div { height: 5px !important; }
           .tito-wind span { font-size: 8px !important; }
           .tito-msg {
-            grid-column: 2 !important; grid-row: 4 !important;
             padding: 1px 2px !important; font-size: 8px !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
           }
           /* Controls: column so fire button renders BELOW the power bar */
           .tito-ctrl {
-            grid-column: 2 !important; grid-row: 5 !important;
             width: 100% !important; box-sizing: border-box !important; max-width: none !important;
+            order: unset !important;
             flex-direction: column !important; align-items: center !important;
             padding: 4px 6px !important; gap: 4px !important; align-self: start !important;
             overflow: hidden !important;
@@ -1488,126 +1614,14 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
           .tito-angle-display { width: 34px !important; font-size: 14px !important; }
           .tito-power-group > span { display: none !important; }
           .tito-info { display: none !important; }
-          /* Minimap: row 6 (right after ctrl row) */
+          /* Minimap */
           .tito-minimap {
-            grid-column: 2 !important; grid-row: 6 !important;
             padding: 2px 4px !important; width: 100% !important; box-sizing: border-box !important;
-            overflow: hidden !important;
+            overflow: hidden !important; order: unset !important;
           }
           .tito-minimap > div { height: 8px !important; overflow: hidden !important; }
         }
       `}</style>
-
-      {/* CONTROLS */}
-      <div className="tito-ctrl" style={{ width: "100%", maxWidth: 820, display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", boxSizing: "border-box", gap: 6 }}>
-
-        {/* View buttons — always shown during aiming / flying phases */}
-        {(phase === "aiming" || phase === "flying") && matchWinner === null && (
-          <div className="tito-vbtns" style={{ display: "flex", gap: 6, justifyContent: "center", flexDirection: myIsLeft ? "row" : "row-reverse" }}>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p1 : p2) : (turn === 0 ? p1 : p2); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${myBtnColor}`, background: "rgba(15,23,42,0.9)", color: myBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>YOU</button>
-            <button onClick={() => { const tk = isMultiplayer ? (myPlayer === 0 ? p2 : p1) : (turn === 0 ? p2 : p1); setViewportX(Math.max(0, Math.min(WORLD_W - VIEW_W, tk.x - VIEW_W / 2))); }} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${oppBtnColor}`, background: "rgba(15,23,42,0.9)", color: oppBtnColor, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "monospace", letterSpacing: 1 }}>{oppBtnName}</button>
-          </div>
-        )}
-
-        {/* Active controls row — only shown when it's your turn */}
-        {canAct && (
-          <div className="tito-actctrl" style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 10, flexWrap: "wrap", width: "100%" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POSITION</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onPointerDown={() => setTankMoving(-1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>⬅</button>
-                <div className="tito-move-label" style={{ width: 44, textAlign: "center", fontSize: 10, color: aC.accent }}>MOVE</div>
-                <button onPointerDown={() => setTankMoving(1)} onPointerUp={() => setTankMoving(0)} onPointerLeave={() => setTankMoving(0)} style={{...btn, userSelect: "none"}}>➡</button>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>ANGLE</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => nudgeAngle(-5)} style={{...btn}}>◀</button>
-                <div className="tito-angle-display" style={{ width: 44, textAlign: "center", fontSize: 20, fontWeight: 900, color: aC.accent }}>{tank.angle}°</div>
-                <button onClick={() => nudgeAngle(5)} style={{...btn}}>▶</button>
-              </div>
-            </div>
-
-            <div className="tito-power-group" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 140 }}>
-              <span style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>POWER</span>
-              <div className="tito-power-bar" style={{ position: "relative", width: 140, height: 18, background: "#1e293b", borderRadius: 9, overflow: "hidden", border: charging ? `2px solid ${chgColor}` : "2px solid #334155" }}>
-                <div style={{ height: "100%", width: charging ? `${chargeProg * 100}%` : `${tank.power}%`, borderRadius: 7, background: charging ? `linear-gradient(90deg,#ef4444,${chgColor})` : `linear-gradient(90deg,${aC.main},${aC.accent})`, transition: charging ? "none" : "width 0.3s", boxShadow: charging ? `0 0 16px ${chgColor}` : "none" }} />
-                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{charging ? chgPow : tank.power}%</span>
-              </div>
-              {charging ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  {["LOW", "MED", "MAX"].map((l, i) => <span key={i} style={{ fontSize: 8, fontWeight: 700, color: i === 0 && chargeProg < 0.33 ? "#ef4444" : i === 1 && chargeProg >= 0.33 && chargeProg < 0.66 ? "#f59e0b" : i === 2 && chargeProg >= 0.66 ? "#22c55e" : "#334155" }}>{l}</span>)}
-                </div>
-              ) : (
-                <span style={{ fontSize: 7, color: "#64748b" }}>Range: {Math.round((tank.power * 0.245) ** 2 / GRAVITY)}px</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Main action area */}
-        {matchWinner !== null ? (
-          <button className="tito-fire-btn" onClick={startNewMatch} style={{ padding: "16px 24px", borderRadius: 12, border: "2px solid #a855f7", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2, cursor: "pointer", boxShadow: "0 0 25px rgba(168,85,247,0.4)", minWidth: 160 }}>🏆 NEW MATCH</button>
-        ) : isMultiplayer && !isMyTurn && phase === "aiming" ? (
-          <div className="tito-fire-btn" style={{ padding: "12px 28px", borderRadius: 12, border: "1px solid #334155", background: "#1e293b", color: "#64748b", fontSize: 13, fontWeight: 700, fontFamily: "monospace", letterSpacing: 2, textAlign: "center" }}>⏳ WAITING...</div>
-        ) : canAct ? (
-          <button
-            className="tito-fire-btn"
-            onPointerDown={startCharge} onPointerUp={releaseCharge}
-            onPointerLeave={() => { if (chargingRef.current) releaseCharge(); }}
-            onContextMenu={e => e.preventDefault()}
-            style={{
-              padding: "16px 24px", borderRadius: 12, border: "2px solid",
-              borderColor: charging ? chgColor : aC.main,
-              background: charging ? `linear-gradient(135deg,#ef4444,${chgColor})` : `linear-gradient(135deg,${aC.main},${aC.accent})`,
-              color: "#fff", fontSize: 15, fontWeight: 900, fontFamily: "monospace", letterSpacing: 2,
-              cursor: "pointer",
-              boxShadow: charging ? `0 0 30px ${chgColor}` : `0 0 20px ${aC.glow}`,
-              transition: "background 0.15s, box-shadow 0.15s, border-color 0.15s", touchAction: "none", minWidth: 190, height: 52, whiteSpace: "nowrap",
-            }}
-          >{charging ? `⚡ ${chgPow}%` : "🔥 HOLD TO FIRE"}</button>
-        ) : null}
-      </div>
-
-
-      <div className="tito-info" style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: 1, textAlign: "center", padding: "0 16px", fontWeight: 600 }}>
-        💀 ANY HIT = INSTANT DEATH <br /> 🏆 FIRST TO {WIN_SCORE} WINS!
-      </div>
-
-      {/* World Position Indicator */}
-      <div className="tito-minimap" style={{ width: "100%", maxWidth: 820, padding: "8px 16px", boxSizing: "border-box" }}>
-        <div
-          style={{ position: "relative", width: "100%", height: 16, background: "#1e293b", borderRadius: 4, overflow: "hidden", cursor: "grab", userSelect: "none" }}
-          onPointerDown={(e) => {
-            if (phase !== "aiming") return;
-            setMinimapDragging(true);
-            const rect = e.currentTarget.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickPercent = clickX / rect.width;
-            const targetWorldX = clickPercent * WORLD_W;
-            const newViewportX = Math.max(0, Math.min(WORLD_W - VIEW_W, targetWorldX - VIEW_W / 2));
-            setViewportX(newViewportX);
-          }}
-          onPointerMove={(e) => {
-            if (!minimapDragging || phase !== "aiming") return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickPercent = Math.max(0, Math.min(1, clickX / rect.width));
-            const targetWorldX = clickPercent * WORLD_W;
-            const newViewportX = Math.max(0, Math.min(WORLD_W - VIEW_W, targetWorldX - VIEW_W / 2));
-            setViewportX(newViewportX);
-          }}
-          onPointerUp={() => setMinimapDragging(false)}
-          onPointerLeave={() => setMinimapDragging(false)}
-        >
-          <div style={{ position: "absolute", left: `${Math.min(p1.x, p2.x) / WORLD_W * 100}%`, width: `${Math.abs(p2.x - p1.x) / WORLD_W * 100}%`, top: "50%", height: 1, background: "rgba(250,204,21,0.3)", transform: "translateY(-50%)" }} />
-          <div style={{ position: "absolute", left: `${(p1.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P1.accent, boxShadow: `0 0 8px ${P1.accent}` }} />
-          <div style={{ position: "absolute", left: `${(p2.x / WORLD_W) * 100}%`, top: 0, width: 3, height: "100%", background: P2.accent, boxShadow: `0 0 8px ${P2.accent}` }} />
-          <div style={{ position: "absolute", left: `${(viewportX / WORLD_W) * 100}%`, top: 0, width: `${(VIEW_W / WORLD_W) * 100}%`, height: "100%", background: cameraDragging ? "rgba(100,200,255,0.2)" : "rgba(255,255,255,0.1)", border: cameraDragging ? "1px solid #64c8ff" : "1px solid rgba(255,255,255,0.3)" }} />
-        </div>
-      </div>
 
       {/* Disconnected overlay */}
       {isMultiplayer && !connected && (
