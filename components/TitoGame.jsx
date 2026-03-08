@@ -1527,10 +1527,13 @@ export default function TitoGame({ isMultiplayer, myPlayer, seed: initialSeed, c
             display: flex !important; flex-direction: column !important;
             overflow-y: auto !important; overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
             align-self: stretch !important;
             max-height: 100% !important;
             width: 100% !important; box-sizing: border-box !important;
           }
+          .tito-right-col * { touch-action: pan-y !important; }
+          .tito-fire-btn, .tito-ctrl button { touch-action: none !important; }
           /* Left column: canvas spans rows 2–end */
           .tito-canvas-wrap {
             grid-column: 1 !important; grid-row: 2 / -1 !important;
